@@ -34,6 +34,9 @@
             border: 2px solid #4b704b;
             margin: 20px 0;
         }
+        #map.picking-mode {
+            cursor: crosshair; /* Changes cursor to crosshair when picking */
+        }
         .controls {
             background-color: #2e4a2e;
             padding: 20px;
@@ -148,6 +151,8 @@
                         marker = L.marker([latNum, lonNum]).addTo(map);
                     }
                     map.setView([latNum, lonNum], map.getZoom()); // Preserve current zoom level
+                    // Revert cursor after coordinate is picked
+                    map.getContainer().classList.remove('picking-mode');
                 } catch (error) {
                     console.error('MGRS conversion error:', error);
                     document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
@@ -174,13 +179,14 @@
             });
 
             document.getElementById('getCoordinateBtn').addEventListener('click', () => {
-                // Activate a one-time click listener on the map
+                // Activate picking mode with crosshair cursor
+                map.getContainer().classList.add('picking-mode');
                 map.once('click', (e) => {
                     const lat = e.latlng.lat;
                     const lon = e.latlng.lng;
                     updateCoordinates(lat, lon);
                 });
-                // Optional: Provide visual feedback to the user
+                // Provide visual feedback to the user
                 alert('Click on the map to get coordinates.');
             });
 
