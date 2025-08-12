@@ -122,7 +122,6 @@
             let marker = null;
 
             function updateCoordinates(lat, lon) {
-                // Validate coordinates
                 if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
                     document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
                     document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
@@ -131,28 +130,24 @@
                 }
 
                 try {
-                    // Ensure coordinates are numbers
                     const lonNum = parseFloat(lon);
                     const latNum = parseFloat(lat);
 
-                    // Check if proj4.mgrs is available
                     if (typeof proj4 === 'undefined' || typeof proj4.mgrs === 'undefined') {
                         throw new Error('MGRS library failed to load');
                     }
 
-                    // Convert to MGRS with 8-digit precision
                     const mgrs = proj4.mgrs.forward([lonNum, latNum]);
                     const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
                     document.getElementById('mgrsOutput').textContent = mgrs;
                     document.getElementById('latLonOutput').textContent = latLon;
 
-                    // Update or create marker
                     if (marker) {
                         marker.setLatLng([latNum, lonNum]);
                     } else {
                         marker = L.marker([latNum, lonNum]).addTo(map);
                     }
-                    map.setView([latNum, lonNum], 10);
+                    map.setView([latNum, lonNum], map.getZoom()); // Preserve current zoom level
                 } catch (error) {
                     console.error('MGRS conversion error:', error);
                     document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
@@ -179,11 +174,14 @@
             });
 
             document.getElementById('getCoordinateBtn').addEventListener('click', () => {
+                // Activate a one-time click listener on the map
                 map.once('click', (e) => {
                     const lat = e.latlng.lat;
                     const lon = e.latlng.lng;
                     updateCoordinates(lat, lon);
                 });
+                // Optional: Provide visual feedback to the user
+                alert('Click on the map to get coordinates.');
             });
 
             document.getElementById('convertInputBtn').addEventListener('click', () => {
@@ -196,7 +194,6 @@
                 updateCoordinates(lat, lon);
             });
 
-            // GPS Zoom Control Button
             const gpsControl = L.Control.extend({
                 options: { position: 'topleft' },
                 onAdd: function (map) {
