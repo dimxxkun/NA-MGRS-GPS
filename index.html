@@ -123,53 +123,10 @@
             color: #ffffff;
             border: 1px solid #4b704b;
         }
-        #loginContainer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        #loginForm {
-            background-color: #2e4a2e;
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-        }
-        #loginForm input {
-            display: block;
-            margin: 10px auto;
-            width: 250px;
-        }
-        #loginForm button {
-            width: 100px;
-        }
-        #loginMessage {
-            color: #ff6666;
-            margin-top: 10px;
-        }
-        .hidden {
-            display: none;
-        }
     </style>
 </head>
 <body>
-    <div id="loginContainer">
-        <div id="loginForm">
-            <h2>Login</h2>
-            <input type="email" id="username" placeholder="Enter email (e.g., user@gmail.com)" required>
-            <input type="password" id="password" placeholder="Enter password" required>
-            <button id="loginBtn">Login</button>
-            <p id="loginMessage"></p>
-        </div>
-    </div>
-    <div class="container hidden" id="appContainer">
+    <div class="container">
         <header>
             <h1>Nigerian Army Coordinate System</h1>
         </header>
@@ -214,461 +171,384 @@
     <script>
         // Signature: dimxxkun
         document.addEventListener('DOMContentLoaded', () => {
-            const loginContainer = document.getElementById('loginContainer');
-            const appContainer = document.getElementById('appContainer');
-            const loginBtn = document.getElementById('loginBtn');
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            const loginMessage = document.getElementById('loginMessage');
+            const map = L.map('map').setView([9.0765, 7.3986], 6);
 
-            // Client-side password (hashed for transmission)
-            const correctPassword = 'proforcegalaxies';
-            const serverUrl = 'http://localhost:3000'; // Update to your server URL
+            // Define basemaps
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            });
 
-            // Simple SHA-256 hash function
-            async function sha256(str) {
-                const msgBuffer = new TextEncoder().encode(str);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            const esriSatellite = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                    maxZoom: 19
+                }
+            );
+
+            osmLayer.addTo(map);
+
+            const baseMaps = {
+                "OpenStreetMap": osmLayer,
+                "Satellite Imagery": esriSatellite
+            };
+
+            L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+            // Define marker icons
+            const gpsIcon = L.divIcon({
+                className: 'gps-marker',
+                html: '<div style="background-color: blue; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            const enemyIcon = L.divIcon({
+                className: 'enemy-marker',
+                html: '<div style="background-color: red; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            let marker = null;
+            let watchId = null;
+            let isTracking = false;
+            let wasTracking = false;
+
+            const coordSystemSelect = document.getElementById('coordSystem');
+            const inputFieldsDiv = document.getElementById('inputFields');
+            const getLocationBtn = document.getElementById('getLocationBtn');
+
+            function updateButtonText() {
+                getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
             }
 
-            loginBtn.addEventListener('click', async () => {
-                const username = usernameInput.value.trim();
-                const password = passwordInput.value;
+            function updateInputFields() {
+                const system = coordSystemSelect.value;
+                inputFieldsDiv.innerHTML = '';
 
-                // Validate email format
-                const emailRegex = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|mil|yahoo|gmail|hotmail)$/i;
-                if (!emailRegex.test(username)) {
-                    loginMessage.textContent = 'Please enter a valid email (e.g., user@gmail.com)';
-                    return;
+                if (system === 'dd') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="latInput">Latitude:</label>
+                        <input type="text" id="latInput" placeholder="e.g., 9.0765" />
+                        <label for="lonInput">Longitude:</label>
+                        <input type="text" id="lonInput" placeholder="e.g., 7.3986" />
+                    `;
+                } else if (system === 'ddm') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="latDeg">Lat Degrees:</label>
+                        <input type="text" id="latDeg" placeholder="e.g., 9" />
+                        <label for="latMin">Minutes:</label>
+                        <input type="text" id="latMin" placeholder="e.g., 4.59" />
+                        <label for="latDir">Direction:</label>
+                        <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
+                        <label for="lonDeg">Lon Degrees:</label>
+                        <input type="text" id="lonDeg" placeholder="e.g., 7" />
+                        <label for="lonMin">Minutes:</label>
+                        <input type="text" id="lonMin" placeholder="e.g., 23.916" />
+                        <label for="lonDir">Direction:</label>
+                        <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
+                    `;
+                } else if (system === 'dms') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="latDeg">Lat Degrees:</label>
+                        <input type="text" id="latDeg" placeholder="e.g., 9" />
+                        <label for="latMin">Minutes:</label>
+                        <input type="text" id="latMin" placeholder="e.g., 4" />
+                        <label for="latSec">Seconds:</label>
+                        <input type="text" id="latSec" placeholder="e.g., 35.4" />
+                        <label for="latDir">Direction:</label>
+                        <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
+                        <label for="lonDeg">Lon Degrees:</label>
+                        <input type="text" id="lonDeg" placeholder="e.g., 7" />
+                        <label for="lonMin">Minutes:</label>
+                        <input type="text" id="lonMin" placeholder="e.g., 23" />
+                        <label for="lonSec">Seconds:</label>
+                        <input type="text" id="lonSec" placeholder="e.g., 54.96" />
+                        <label for="lonDir">Direction:</label>
+                        <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
+                    `;
+                } else if (system === 'utm') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="zone">Zone:</label>
+                        <input type="text" id="zone" placeholder="e.g., 32" />
+                        <label for="easting">Easting:</label>
+                        <input type="text" id="easting" placeholder="e.g., 609517" />
+                        <label for="northing">Northing:</label>
+                        <input type="text" id="northing" placeholder="e.g., 1002972" />
+                        <label for="hemisphere">Hemisphere:</label>
+                        <select id="hemisphere"><option value="N">Northern</option><option value="S">Southern</option></select>
+                    `;
+                } else if (system === 'usng') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="usngInput">USNG:</label>
+                        <input type="text" id="usngInput" placeholder="e.g., 32NPA0950010297" style="width: 300px;" />
+                    `;
+                } else if (system === 'maidenhead') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="maidenheadInput">Maidenhead:</label>
+                        <input type="text" id="maidenheadInput" placeholder="e.g., JJ52QH" style="width: 300px;" />
+                    `;
+                } else if (system === 'pluscodes') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="plusCodeInput">Plus Code:</label>
+                        <input type="text" id="plusCodeInput" placeholder="e.g., 6GCRPR6C+2F" style="width: 300px;" />
+                    `;
                 }
+            }
 
-                // Validate password
-                if (password !== correctPassword) {
-                    loginMessage.textContent = 'Incorrect password';
-                    return;
-                }
+            coordSystemSelect.addEventListener('change', updateInputFields);
+            updateInputFields();
 
-                // Hash password for transmission
-                const hashedPassword = await sha256(password);
+            function parseCoordinateInput() {
+                const system = coordSystemSelect.value;
+                let lat, lon;
 
-                // Send login request to server
-                loginMessage.textContent = 'Awaiting approval...';
                 try {
-                    const response = await fetch(`${serverUrl}/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password: hashedPassword })
-                    });
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        // Poll for approval status
-                        const token = data.token;
-                        const pollInterval = setInterval(async () => {
-                            const statusResponse = await fetch(`${serverUrl}/status/${token}`);
-                            const statusData = await statusResponse.json();
-
-                            if (statusData.status === 'approved') {
-                                clearInterval(pollInterval);
-                                loginContainer.classList.add('hidden');
-                                appContainer.classList.remove('hidden');
-                                initializeMap();
-                            } else if (statusData.status === 'rejected') {
-                                clearInterval(pollInterval);
-                                loginMessage.textContent = 'Login rejected by administrator';
-                            }
-                        }, 3000); // Poll every 3 seconds
-                    } else {
-                        loginMessage.textContent = data.message || 'Login request failed';
+                    if (system === 'dd') {
+                        lat = parseFloat(document.getElementById('latInput').value);
+                        lon = parseFloat(document.getElementById('lonInput').value);
+                        if (isNaN(lat) || isNaN(lon)) throw new Error('Invalid DD coordinates');
+                    } else if (system === 'ddm') {
+                        const latDeg = parseFloat(document.getElementById('latDeg').value);
+                        const latMin = parseFloat(document.getElementById('latMin').value);
+                        const latDir = document.getElementById('latDir').value;
+                        const lonDeg = parseFloat(document.getElementById('lonDeg').value);
+                        const lonMin = parseFloat(document.getElementById('lonMin').value);
+                        const lonDir = document.getElementById('lonDir').value;
+                        if (isNaN(latDeg) || isNaN(latMin) || isNaN(lonDeg) || isNaN(lonMin)) {
+                            throw new Error('Invalid DDM coordinates');
+                        }
+                        lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latDir}`, 'dms');
+                        lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonDir}`, 'dms');
+                    } else if (system === 'dms') {
+                        const latDeg = parseFloat(document.getElementById('latDeg').value);
+                        const latMin = parseFloat(document.getElementById('latMin').value);
+                        const latSec = parseFloat(document.getElementById('latSec').value);
+                        const latDir = document.getElementById('latDir').value;
+                        const lonDeg = parseFloat(document.getElementById('lonDeg').value);
+                        const lonMin = parseFloat(document.getElementById('lonMin').value);
+                        const lonSec = parseFloat(document.getElementById('lonSec').value);
+                        const lonDir = document.getElementById('lonDir').value;
+                        if (isNaN(latDeg) || isNaN(latMin) || isNaN(latSec) || isNaN(lonDeg) || isNaN(lonMin) || isNaN(lonSec)) {
+                            throw new Error('Invalid DMS coordinates');
+                        }
+                        lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latSec} ${latDir}`, 'dms');
+                        lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonSec} ${lonDir}`, 'dms');
+                    } else if (system === 'utm') {
+                        const zone = parseInt(document.getElementById('zone').value);
+                        const easting = parseFloat(document.getElementById('easting').value);
+                        const northing = parseFloat(document.getElementById('northing').value);
+                        const hemisphere = document.getElementById('hemisphere').value;
+                        if (isNaN(zone) || isNaN(easting) || isNaN(northing)) {
+                            throw new Error('Invalid UTM coordinates');
+                        }
+                        const utm = new Geodesy.Utm(zone, hemisphere, easting, northing);
+                        const latLon = utm.toLatLon();
+                        lat = latLon.lat;
+                        lon = latLon.lon;
+                    } else if (system === 'usng') {
+                        const usngStr = document.getElementById('usngInput').value.trim();
+                        const mgrs = Geodesy.Mgrs.parse(usngStr);
+                        const latLon = mgrs.toUtm().toLatLon();
+                        lat = latLon.lat;
+                        lon = latLon.lon;
+                    } else if (system === 'maidenhead') {
+                        const maidenhead = document.getElementById('maidenheadInput').value.trim().toUpperCase();
+                        if (!/^[A-R]{2}[0-9]{2}[A-X]{2}$/.test(maidenhead)) {
+                            throw new Error('Invalid Maidenhead locator');
+                        }
+                        const lon = (maidenhead.charCodeAt(0) - 65) * 20 - 180 + (parseInt(maidenhead[2]) * 2) + (maidenhead.charCodeAt(4) - 65) * 0.083333;
+                        const lat = (maidenhead.charCodeAt(1) - 65) * 10 - 90 + parseInt(maidenhead[3]) + (maidenhead.charCodeAt(5) - 65) * 0.041667;
+                        return { lat, lon };
+                    } else if (system === 'pluscodes') {
+                        const plusCode = document.getElementById('plusCodeInput').value.trim();
+                        if (!OpenLocationCode.isValid(plusCode)) {
+                            throw new Error('Invalid Plus Code');
+                        }
+                        const decoded = OpenLocationCode.decode(plusCode);
+                        lat = decoded.latitudeCenter;
+                        lon = decoded.longitudeCenter;
                     }
+                    return { lat, lon };
                 } catch (error) {
-                    loginMessage.textContent = 'Error connecting to server';
-                    console.error('Login error:', error);
+                    throw new Error(`Parsing error: ${error.message}`);
+                }
+            }
+
+            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
+                if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                    document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('accuracyOutput').textContent = 'N/A';
+                    alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
+                    return;
+                }
+
+                try {
+                    const lonNum = parseFloat(lon);
+                    const latNum = parseFloat(lat);
+
+                    if (typeof proj4 === 'undefined' || typeof proj4.mgrs === 'undefined') {
+                        throw new Error('MGRS library failed to load');
+                    }
+
+                    const mgrs = proj4.mgrs.forward([lonNum, latNum]);
+                    const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
+                    document.getElementById('mgrsOutput').textContent = mgrs;
+                    document.getElementById('latLonOutput').textContent = latLon;
+                    document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
+
+                    if (marker) {
+                        marker.setLatLng([latNum, lonNum]);
+                        marker.setIcon(isGps ? gpsIcon : enemyIcon);
+                    } else {
+                        marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
+                    }
+                    map.setView([latNum, lonNum], map.getZoom());
+                    map.getContainer().classList.remove('picking-mode');
+                } catch (error) {
+                    console.error('MGRS conversion error:', error);
+                    document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
+                    document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                    document.getElementById('accuracyOutput').textContent = 'N/A';
+                }
+            }
+
+            getLocationBtn.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by this browser.');
+                    return;
+                }
+
+                if (isTracking) {
+                    if (watchId !== null) {
+                        navigator.geolocation.clearWatch(watchId);
+                        watchId = null;
+                    }
+                    isTracking = false;
+                    updateButtonText();
+                } else {
+                    watchId = navigator.geolocation.watchPosition(
+                        (position) => {
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
+                            const accuracy = position.coords.accuracy;
+                            console.log('Real-time position:', lat, lon, `Accuracy: ±${accuracy} meters`);
+                            updateCoordinates(lat, lon, accuracy, true);
+                        },
+                        (error) => {
+                            console.error('Geolocation error:', error);
+                            alert('Unable to retrieve location: ' + error.message);
+                            if (watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
+                            }
+                            isTracking = false;
+                            updateButtonText();
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        }
+                    );
+                    isTracking = true;
+                    updateButtonText();
                 }
             });
 
-            function initializeMap() {
-                const map = L.map('map').setView([9.0765, 7.3986], 6);
+            document.getElementById('selectEnemyBtn').addEventListener('click', () => {
+                if (isTracking && watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                    wasTracking = true;
+                    isTracking = false;
+                    updateButtonText();
+                } else {
+                    wasTracking = false;
+                }
 
-                // Define basemaps
-                const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                    maxZoom: 19
+                map.getContainer().classList.add('picking-mode');
+                map.once('click', (e) => {
+                    const lat = e.latlng.lat;
+                    const lon = e.latlng.lng;
+                    updateCoordinates(lat, lon, null, false);
                 });
+                alert('Click the map to select enemy coordinates.');
+            });
 
-                const esriSatellite = L.tileLayer(
-                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    {
-                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-                        maxZoom: 19
-                    }
-                );
-
-                osmLayer.addTo(map);
-
-                const baseMaps = {
-                    "OpenStreetMap": osmLayer,
-                    "Satellite Imagery": esriSatellite
-                };
-
-                L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
-
-                // Define marker icons
-                const gpsIcon = L.divIcon({
-                    className: 'gps-marker',
-                    html: '<div style="background-color: blue; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
-                });
-
-                const enemyIcon = L.divIcon({
-                    className: 'enemy-marker',
-                    html: '<div style="background-color: red; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
-                });
-
-                let marker = null;
-                let watchId = null;
-                let isTracking = false;
-                let wasTracking = false;
-
-                const coordSystemSelect = document.getElementById('coordSystem');
-                const inputFieldsDiv = document.getElementById('inputFields');
-                const getLocationBtn = document.getElementById('getLocationBtn');
-
-                function updateButtonText() {
-                    getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
+            document.getElementById('convertInputBtn').addEventListener('click', () => {
+                if (isTracking && watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                    wasTracking = true;
+                    isTracking = false;
+                    updateButtonText();
+                } else {
+                    wasTracking = false;
                 }
 
-                function updateInputFields() {
-                    const system = coordSystemSelect.value;
-                    inputFieldsDiv.innerHTML = '';
-
-                    if (system === 'dd') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="latInput">Latitude:</label>
-                            <input type="text" id="latInput" placeholder="e.g., 9.0765" />
-                            <label for="lonInput">Longitude:</label>
-                            <input type="text" id="lonInput" placeholder="e.g., 7.3986" />
-                        `;
-                    } else if (system === 'ddm') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="latDeg">Lat Degrees:</label>
-                            <input type="text" id="latDeg" placeholder="e.g., 9" />
-                            <label for="latMin">Minutes:</label>
-                            <input type="text" id="latMin" placeholder="e.g., 4.59" />
-                            <label for="latDir">Direction:</label>
-                            <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-                            <label for="lonDeg">Lon Degrees:</label>
-                            <input type="text" id="lonDeg" placeholder="e.g., 7" />
-                            <label for="lonMin">Minutes:</label>
-                            <input type="text" id="lonMin" placeholder="e.g., 23.916" />
-                            <label for="lonDir">Direction:</label>
-                            <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
-                        `;
-                    } else if (system === 'dms') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="latDeg">Lat Degrees:</label>
-                            <input type="text" id="latDeg" placeholder="e.g., 9" />
-                            <label for="latMin">Minutes:</label>
-                            <input type="text" id="latMin" placeholder="e.g., 4" />
-                            <label for="latSec">Seconds:</label>
-                            <input type="text" id="latSec" placeholder="e.g., 35.4" />
-                            <label for="latDir">Direction:</label>
-                            <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-                            <label for="lonDeg">Lon Degrees:</label>
-                            <input type="text" id="lonDeg" placeholder="e.g., 7" />
-                            <label for="lonMin">Minutes:</label>
-                            <input type="text" id="lonMin" placeholder="e.g., 23" />
-                            <label for="lonSec">Seconds:</label>
-                            <input type="text" id="lonSec" placeholder="e.g., 54.96" />
-                            <label for="lonDir">Direction:</label>
-                            <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
-                        `;
-                    } else if (system === 'utm') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="zone">Zone:</label>
-                            <input type="text" id="zone" placeholder="e.g., 32" />
-                            <label for="easting">Easting:</label>
-                            <input type="text" id="easting" placeholder="e.g., 609517" />
-                            <label for="northing">Northing:</label>
-                            <input type="text" id="northing" placeholder="e.g., 1002972" />
-                            <label for="hemisphere">Hemisphere:</label>
-                            <select id="hemisphere"><option value="N">Northern</option><option value="S">Southern</option></select>
-                        `;
-                    } else if (system === 'usng') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="usngInput">USNG:</label>
-                            <input type="text" id="usngInput" placeholder="e.g., 32NPA0950010297" style="width: 300px;" />
-                        `;
-                    } else if (system === 'maidenhead') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="maidenheadInput">Maidenhead:</label>
-                            <input type="text" id="maidenheadInput" placeholder="e.g., JJ52QH" style="width: 300px;" />
-                        `;
-                    } else if (system === 'pluscodes') {
-                        inputFieldsDiv.innerHTML = `
-                            <label for="plusCodeInput">Plus Code:</label>
-                            <input type="text" id="plusCodeInput" placeholder="e.g., 6GCRPR6C+2F" style="width: 300px;" />
-                        `;
-                    }
+                try {
+                    const { lat, lon } = parseCoordinateInput();
+                    updateCoordinates(lat, lon, null, false);
+                } catch (error) {
+                    alert(error.message);
                 }
+            });
 
-                coordSystemSelect.addEventListener('change', updateInputFields);
-                updateInputFields();
+            const gpsControl = L.Control.extend({
+                options: { position: 'topleft' },
+                onAdd: function (map) {
+                    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+                    container.innerHTML = '📍';
+                    container.title = 'Zoom to your GPS location';
+                    container.style.backgroundColor = '#4b704b';
+                    container.style.width = '34px';
+                    container.style.height = '34px';
+                    container.style.display = 'flex';
+                    container.style.justifyContent = 'center';
+                    container.style.alignItems = 'center';
+                    container.style.cursor = 'pointer';
+                    container.style.fontSize = '18px';
+                    container.style.color = 'white';
 
-                function parseCoordinateInput() {
-                    const system = coordSystemSelect.value;
-                    let lat, lon;
-
-                    try {
-                        if (system === 'dd') {
-                            lat = parseFloat(document.getElementById('latInput').value);
-                            lon = parseFloat(document.getElementById('lonInput').value);
-                            if (isNaN(lat) || isNaN(lon)) throw new Error('Invalid DD coordinates');
-                        } else if (system === 'ddm') {
-                            const latDeg = parseFloat(document.getElementById('latDeg').value);
-                            const latMin = parseFloat(document.getElementById('latMin').value);
-                            const latDir = document.getElementById('latDir').value;
-                            const lonDeg = parseFloat(document.getElementById('lonDeg').value);
-                            const lonMin = parseFloat(document.getElementById('lonMin').value);
-                            const lonDir = document.getElementById('lonDir').value;
-                            if (isNaN(latDeg) || isNaN(latMin) || isNaN(lonDeg) || isNaN(lonMin)) {
-                                throw new Error('Invalid DDM coordinates');
-                            }
-                            lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latDir}`, 'dms');
-                            lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonDir}`, 'dms');
-                        } else if (system === 'dms') {
-                            const latDeg = parseFloat(document.getElementById('latDeg').value);
-                            const latMin = parseFloat(document.getElementById('latMin').value);
-                            const latSec = parseFloat(document.getElementById('latSec').value);
-                            const latDir = document.getElementById('latDir').value;
-                            const lonDeg = parseFloat(document.getElementById('lonDeg').value);
-                            const lonMin = parseFloat(document.getElementById('lonMin').value);
-                            const lonSec = parseFloat(document.getElementById('lonSec').value);
-                            const lonDir = document.getElementById('lonDir').value;
-                            if (isNaN(latDeg) || isNaN(latMin) || isNaN(latSec) || isNaN(lonDeg) || isNaN(lonMin) || isNaN(lonSec)) {
-                                throw new Error('Invalid DMS coordinates');
-                            }
-                            lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latSec} ${latDir}`, 'dms');
-                            lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonSec} ${lonDir}`, 'dms');
-                        } else if (system === 'utm') {
-                            const zone = parseInt(document.getElementById('zone').value);
-                            const easting = parseFloat(document.getElementById('easting').value);
-                            const northing = parseFloat(document.getElementById('northing').value);
-                            const hemisphere = document.getElementById('hemisphere').value;
-                            if (isNaN(zone) || isNaN(easting) || isNaN(northing)) {
-                                throw new Error('Invalid UTM coordinates');
-                            }
-                            const utm = new Geodesy.Utm(zone, hemisphere, easting, northing);
-                            const latLon = utm.toLatLon();
-                            lat = latLon.lat;
-                            lon = latLon.lon;
-                        } else if (system === 'usng') {
-                            const usngStr = document.getElementById('usngInput').value.trim();
-                            const mgrs = Geodesy.Mgrs.parse(usngStr);
-                            const latLon = mgrs.toUtm().toLatLon();
-                            lat = latLon.lat;
-                            lon = latLon.lon;
-                        } else if (system === 'maidenhead') {
-                            const maidenhead = document.getElementById('maidenheadInput').value.trim().toUpperCase();
-                            if (!/^[A-R]{2}[0-9]{2}[A-X]{2}$/.test(maidenhead)) {
-                                throw new Error('Invalid Maidenhead locator');
-                            }
-                            const lon = (maidenhead.charCodeAt(0) - 65) * 20 - 180 + (parseInt(maidenhead[2]) * 2) + (maidenhead.charCodeAt(4) - 65) * 0.083333;
-                            const lat = (maidenhead.charCodeAt(1) - 65) * 10 - 90 + parseInt(maidenhead[3]) + (maidenhead.charCodeAt(5) - 65) * 0.041667;
-                            return { lat, lon };
-                        } else if (system === 'pluscodes') {
-                            const plusCode = document.getElementById('plusCodeInput').value.trim();
-                            if (!OpenLocationCode.isValid(plusCode)) {
-                                throw new Error('Invalid Plus Code');
-                            }
-                            const decoded = OpenLocationCode.decode(plusCode);
-                            lat = decoded.latitudeCenter;
-                            lon = decoded.longitudeCenter;
-                        }
-                        return { lat, lon };
-                    } catch (error) {
-                        throw new Error(`Parsing error: ${error.message}`);
-                    }
-                }
-
-                function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
-                    if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-                        document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
-                        document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
-                        document.getElementById('accuracyOutput').textContent = 'N/A';
-                        alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
-                        return;
-                    }
-
-                    try {
-                        const lonNum = parseFloat(lon);
-                        const latNum = parseFloat(lat);
-
-                        if (typeof proj4 === 'undefined' || typeof proj4.mgrs === 'undefined') {
-                            throw new Error('MGRS library failed to load');
-                        }
-
-                        const mgrs = proj4.mgrs.forward([lonNum, latNum]);
-                        const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
-                        document.getElementById('mgrsOutput').textContent = mgrs;
-                        document.getElementById('latLonOutput').textContent = latLon;
-                        document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
-
-                        if (marker) {
-                            marker.setLatLng([latNum, lonNum]);
-                            marker.setIcon(isGps ? gpsIcon : enemyIcon);
-                        } else {
-                            marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
-                        }
-                        map.setView([latNum, lonNum], map.getZoom());
-                        map.getContainer().classList.remove('picking-mode');
-                    } catch (error) {
-                        console.error('MGRS conversion error:', error);
-                        document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
-                        document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-                        document.getElementById('accuracyOutput').textContent = 'N/A';
-                    }
-                }
-
-                getLocationBtn.addEventListener('click', () => {
-                    if (!navigator.geolocation) {
-                        alert('Geolocation is not supported by this browser.');
-                        return;
-                    }
-
-                    if (isTracking) {
-                        if (watchId !== null) {
-                            navigator.geolocation.clearWatch(watchId);
-                            watchId = null;
-                        }
-                        isTracking = false;
-                        updateButtonText();
-                    } else {
-                        watchId = navigator.geolocation.watchPosition(
-                            (position) => {
-                                const lat = position.coords.latitude;
-                                const lon = position.coords.longitude;
-                                const accuracy = position.coords.accuracy;
-                                console.log('Real-time position:', lat, lon, `Accuracy: ±${accuracy} meters`);
-                                updateCoordinates(lat, lon, accuracy, true);
-                            },
-                            (error) => {
-                                console.error('Geolocation error:', error);
-                                alert('Unable to retrieve location: ' + error.message);
-                                if (watchId !== null) {
-                                    navigator.geolocation.clearWatch(watchId);
-                                    watchId = null;
-                                }
+                    container.onclick = function () {
+                        if (navigator.geolocation) {
+                            if (isTracking && watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
+                                wasTracking = true;
                                 isTracking = false;
                                 updateButtonText();
-                            },
-                            {
-                                enableHighAccuracy: true,
-                                timeout: 10000,
-                                maximumAge: 0
-                            }
-                        );
-                        isTracking = true;
-                        updateButtonText();
-                    }
-                });
-
-                document.getElementById('selectEnemyBtn').addEventListener('click', () => {
-                    if (isTracking && watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
-                        wasTracking = true;
-                        isTracking = false;
-                        updateButtonText();
-                    } else {
-                        wasTracking = false;
-                    }
-
-                    map.getContainer().classList.add('picking-mode');
-                    map.once('click', (e) => {
-                        const lat = e.latlng.lat;
-                        const lon = e.latlng.lng;
-                        updateCoordinates(lat, lon, null, false);
-                    });
-                    alert('Click the map to select enemy coordinates.');
-                });
-
-                document.getElementById('convertInputBtn').addEventListener('click', () => {
-                    if (isTracking && watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
-                        wasTracking = true;
-                        isTracking = false;
-                        updateButtonText();
-                    } else {
-                        wasTracking = false;
-                    }
-
-                    try {
-                        const { lat, lon } = parseCoordinateInput();
-                        updateCoordinates(lat, lon, null, false);
-                    } catch (error) {
-                        alert(error.message);
-                    }
-                });
-
-                const gpsControl = L.Control.extend({
-                    options: { position: 'topleft' },
-                    onAdd: function (map) {
-                        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-                        container.innerHTML = '📍';
-                        container.title = 'Zoom to your GPS location';
-                        container.style.backgroundColor = '#4b704b';
-                        container.style.width = '34px';
-                        container.style.height = '34px';
-                        container.style.display = 'flex';
-                        container.style.justifyContent = 'center';
-                        container.style.alignItems = 'center';
-                        container.style.cursor = 'pointer';
-                        container.style.fontSize = '18px';
-                        container.style.color = 'white';
-
-                        container.onclick = function () {
-                            if (navigator.geolocation) {
-                                if (isTracking && watchId !== null) {
-                                    navigator.geolocation.clearWatch(watchId);
-                                    watchId = null;
-                                    wasTracking = true;
-                                    isTracking = false;
-                                    updateButtonText();
-                                } else {
-                                    wasTracking = false;
-                                }
-
-                                navigator.geolocation.getCurrentPosition(
-                                    (position) => {
-                                        const lat = position.coords.latitude;
-                                        const lon = position.coords.longitude;
-                                        const accuracy = position.coords.accuracy;
-                                        map.setView([lat, lon], 15);
-                                        updateCoordinates(lat, lon, accuracy, true);
-                                    },
-                                    (error) => {
-                                        alert('Unable to access GPS: ' + error.message);
-                                    }
-                                );
                             } else {
-                                alert('Geolocation not supported.');
+                                wasTracking = false;
                             }
-                        };
 
-                        return container;
-                    }
-                });
+                            navigator.geolocation.getCurrentPosition(
+                                (position) => {
+                                    const lat = position.coords.latitude;
+                                    const lon = position.coords.longitude;
+                                    const accuracy = position.coords.accuracy;
+                                    map.setView([lat, lon], 15);
+                                    updateCoordinates(lat, lon, accuracy, true);
+                                },
+                                (error) => {
+                                    alert('Unable to access GPS: ' + error.message);
+                                }
+                            );
+                        } else {
+                            alert('Geolocation not supported.');
+                        }
+                    };
 
-                map.addControl(new gpsControl());
-                updateButtonText();
-            }
+                    return container;
+                }
+            });
+
+            map.addControl(new gpsControl());
+            updateButtonText();
         });
     </script>
 </body>
