@@ -198,10 +198,25 @@
 
             L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
+            // Define marker icons
+            const gpsIcon = L.divIcon({
+                className: 'gps-marker',
+                html: '<div style="background-color: blue; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            const enemyIcon = L.divIcon({
+                className: 'enemy-marker',
+                html: '<div style="background-color: red; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white;"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
             let marker = null;
             let watchId = null;
             let isTracking = false;
-            let wasTracking = false; // Track if tracking was active before pausing
+            let wasTracking = false;
 
             const coordSystemSelect = document.getElementById('coordSystem');
             const inputFieldsDiv = document.getElementById('inputFields');
@@ -355,7 +370,7 @@
                 }
             }
 
-            function updateCoordinates(lat, lon, accuracy = null) {
+            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
                 if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
                     document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
                     document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
@@ -380,8 +395,9 @@
 
                     if (marker) {
                         marker.setLatLng([latNum, lonNum]);
+                        marker.setIcon(isGps ? gpsIcon : enemyIcon);
                     } else {
-                        marker = L.marker([latNum, lonNum]).addTo(map);
+                        marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
                     }
                     map.setView([latNum, lonNum], map.getZoom());
                     map.getContainer().classList.remove('picking-mode');
@@ -406,7 +422,6 @@
                     }
                     isTracking = false;
                     updateButtonText();
-                    alert('Location tracking stopped.');
                 } else {
                     watchId = navigator.geolocation.watchPosition(
                         (position) => {
@@ -414,7 +429,7 @@
                             const lon = position.coords.longitude;
                             const accuracy = position.coords.accuracy;
                             console.log('Real-time position:', lat, lon, `Accuracy: ±${accuracy} meters`);
-                            updateCoordinates(lat, lon, accuracy);
+                            updateCoordinates(lat, lon, accuracy, true);
                         },
                         (error) => {
                             console.error('Geolocation error:', error);
@@ -434,50 +449,43 @@
                     );
                     isTracking = true;
                     updateButtonText();
-                    alert('Location tracking started.');
                 }
             });
 
             document.getElementById('selectEnemyBtn').addEventListener('click', () => {
-                // Pause tracking if active
                 if (isTracking && watchId !== null) {
                     navigator.geolocation.clearWatch(watchId);
                     watchId = null;
-                    wasTracking = true; // Remember tracking was active
+                    wasTracking = true;
                     isTracking = false;
                     updateButtonText();
-                    alert('Location tracking paused to select enemy coordinates.');
                 } else {
-                    wasTracking = false; // Tracking was not active
+                    wasTracking = false;
                 }
 
                 map.getContainer().classList.add('picking-mode');
                 map.once('click', (e) => {
                     const lat = e.latlng.lat;
                     const lon = e.latlng.lng;
-                    updateCoordinates(lat, lon);
-                    alert('Enemy coordinates selected. Click "Start Tracking Location" to resume GPS tracking if needed.');
+                    updateCoordinates(lat, lon, null, false);
                 });
-                alert('Click on the map to select enemy coordinates.');
+                alert('Click the map to select enemy coordinates.');
             });
 
             document.getElementById('convertInputBtn').addEventListener('click', () => {
-                // Pause tracking if active
                 if (isTracking && watchId !== null) {
                     navigator.geolocation.clearWatch(watchId);
                     watchId = null;
-                    wasTracking = true; // Remember tracking was active
+                    wasTracking = true;
                     isTracking = false;
                     updateButtonText();
-                    alert('Location tracking paused to convert input coordinates.');
                 } else {
-                    wasTracking = false; // Tracking was not active
+                    wasTracking = false;
                 }
 
                 try {
                     const { lat, lon } = parseCoordinateInput();
-                    updateCoordinates(lat, lon);
-                    alert('Coordinates converted. Click "Start Tracking Location" to resume GPS tracking if needed.');
+                    updateCoordinates(lat, lon, null, false);
                 } catch (error) {
                     alert(error.message);
                 }
@@ -501,16 +509,14 @@
 
                     container.onclick = function () {
                         if (navigator.geolocation) {
-                            // Pause tracking if active
                             if (isTracking && watchId !== null) {
                                 navigator.geolocation.clearWatch(watchId);
                                 watchId = null;
-                                wasTracking = true; // Remember tracking was active
+                                wasTracking = true;
                                 isTracking = false;
                                 updateButtonText();
-                                alert('Location tracking paused to zoom to current location.');
                             } else {
-                                wasTracking = false; // Tracking was not active
+                                wasTracking = false;
                             }
 
                             navigator.geolocation.getCurrentPosition(
@@ -518,9 +524,8 @@
                                     const lat = position.coords.latitude;
                                     const lon = position.coords.longitude;
                                     const accuracy = position.coords.accuracy;
-                                    map.setView([lat, lon], 12);
-                                    updateCoordinates(lat, lon, accuracy);
-                                    alert('Zoomed to current location. Click "Start Tracking Location" to resume GPS tracking if needed.');
+                                    map.setView([lat, lon], 15); // Increased zoom level to 15
+                                    updateCoordinates(lat, lon, accuracy, true);
                                 },
                                 (error) => {
                                     alert('Unable to access GPS: ' + error.message);
