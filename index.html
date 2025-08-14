@@ -43,6 +43,12 @@
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
         button {
             background-color: #4b704b;
             color: #ffffff;
@@ -55,6 +61,13 @@
         }
         button:hover {
             background-color: #5a8a5a;
+        }
+        #selectEnemyBtn {
+            background-color: #a00;
+            margin-left: auto;
+        }
+        #selectEnemyBtn:hover {
+            background-color: #c00;
         }
         .input-group {
             margin: 10px 0;
@@ -105,8 +118,10 @@
         </header>
         <div id="map"></div>
         <div class="controls">
-            <button id="getLocationBtn">Use My Current Location</button>
-            <button id="getCoordinateBtn">Get Coordinate from Map</button>
+            <div class="button-group">
+                <button id="getLocationBtn">Use My Current Location</button>
+                <button id="selectEnemyBtn">Select Enemy Coordinates</button>
+            </div>
             <div class="input-group">
                 <label for="coordSystem">Coordinate System:</label>
                 <select id="coordSystem">
@@ -225,7 +240,7 @@
             }
 
             coordSystemSelect.addEventListener('change', updateInputFields);
-            updateInputFields(); // Initialize input fields
+            updateInputFields();
 
             function parseCoordinateInput() {
                 const system = coordSystemSelect.value;
@@ -350,14 +365,14 @@
                 }
             });
 
-            document.getElementById('getCoordinateBtn').addEventListener('click', () => {
+            document.getElementById('selectEnemyBtn').addEventListener('click', () => {
                 map.getContainer().classList.add('picking-mode');
                 map.once('click', (e) => {
                     const lat = e.latlng.lat;
                     const lon = e.latlng.lng;
                     updateCoordinates(lat, lon);
                 });
-                alert('Click on the map to get coordinates.');
+                alert('Click on the map to select enemy coordinates.');
             });
 
             document.getElementById('convertInputBtn').addEventListener('click', () => {
