@@ -69,6 +69,12 @@
         #selectEnemyBtn:hover {
             background-color: #c00;
         }
+        #downloadTilesBtn {
+            background-color: #3a5f3a;
+        }
+        #downloadTilesBtn:hover {
+            background-color: #4a7f4a;
+        }
         .input-group {
             margin: 10px 0;
         }
@@ -134,7 +140,8 @@
         <div id="map"></div>
         <div class="controls">
             <div class="button-group">
-                <button id="getLocationBtn">Use My Current Location</button>
+                <button id="getLocationBtn">Start Tracking Location</button>
+                <button id="downloadTilesBtn">Download Map Tiles</button>
                 <button id="selectEnemyBtn">Select Enemy Coordinates</button>
             </div>
             <div class="input-group">
@@ -161,6 +168,7 @@
                 <h3>Coordinates</h3>
                 <p><strong>MGRS:</strong> <span id="mgrsOutput">Click a button to get coordinates</span></p>
                 <p><strong>Lat/Long:</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
             </div>
         </div>
     </div>
@@ -171,40 +179,65 @@
     <script src="https://unpkg.com/geodesy@2.2.1/mgrs.js"></script>
     <script src="https://unpkg.com/geodesy@2.2.1/utm.js"></script>
     <script src="https://unpkg.com/geodesy@2.2.1/dms.js"></script>
+    <script src="https://unpkg.com/leaflet.offline@2.2.0/dist/leaflet.offline.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const map = L.map('map').setView([9.0765, 7.3986], 6);
 
             // Define basemaps
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            const osmLayer = L.tileLayer.offline('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
+                maxZoom: 19,
+                subdomains: 'abc',
+                tileSize: 256,
+                zoomOffset: 0
             });
 
-            const esriSatellite = L.tileLayer(
+            const esriSatellite = L.tileLayer.offline(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 {
                     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-                    maxZoom: 19
+                    maxZoom: 19,
+                    tileSize: 256,
+                    zoomOffset: 0
                 }
             );
 
-            // Add default basemap (OSM) to map
             osmLayer.addTo(map);
 
-            // Create basemap control
             const baseMaps = {
                 "OpenStreetMap": osmLayer,
                 "Satellite Imagery": esriSatellite
             };
 
-            // Add layer control to switch basemaps
             L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
+            // Offline tile saving control
+            const tileControl = L.control.savetiles(osmLayer, {
+                position: 'topright',
+                zoomlevels: [6, 8, 10, 12, 14, 16], // Available zoom levels for caching
+                confirm: (layer, successCallback) => {
+                    if (window.confirm(`Download ${layer._tilesforSave.length} tiles for offline use?`)) {
+                        successCallback();
+                    }
+                },
+                saveText: '💾 Save Tiles',
+                rmText: '🗑️ Clear Tiles'
+            });
+            tileControl.addTo(map);
+
             let marker = null;
+            let watchId = null;
+            let isTracking = false;
 
             const coordSystemSelect = document.getElementById('coordSystem');
             const inputFieldsDiv = document.getElementById('inputFields');
+            const getLocationBtn = document.getElementById('getLocationBtn');
+            const downloadTilesBtn = document.getElementById('downloadTilesBtn');
+
+            function updateButtonText() {
+                getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
+            }
 
             function updateInputFields() {
                 const system = coordSystemSelect.value;
@@ -350,10 +383,11 @@
                 }
             }
 
-            function updateCoordinates(lat, lon) {
+            function updateCoordinates(lat, lon, accuracy = null) {
                 if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
                     document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
                     document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('accuracyOutput').textContent = 'N/A';
                     alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
                     return;
                 }
@@ -370,6 +404,7 @@
                     const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
                     document.getElementById('mgrsOutput').textContent = mgrs;
                     document.getElementById('latLonOutput').textContent = latLon;
+                    document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
 
                     if (marker) {
                         marker.setLatLng([latNum, lonNum]);
@@ -382,24 +417,52 @@
                     console.error('MGRS conversion error:', error);
                     document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
                     document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                    document.getElementById('accuracyOutput').textContent = 'N/A';
                 }
             }
 
-            document.getElementById('getLocationBtn').addEventListener('click', () => {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
+            getLocationBtn.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    alert('Geolocation is not supported by this browser.');
+                    return;
+                }
+
+                if (isTracking) {
+                    if (watchId !== null) {
+                        navigator.geolocation.clearWatch(watchId);
+                        watchId = null;
+                    }
+                    isTracking = false;
+                    updateButtonText();
+                    alert('Location tracking stopped.');
+                } else {
+                    watchId = navigator.geolocation.watchPosition(
                         (position) => {
                             const lat = position.coords.latitude;
                             const lon = position.coords.longitude;
-                            console.log('Geolocation:', lat, lon);
-                            updateCoordinates(lat, lon);
+                            const accuracy = position.coords.accuracy;
+                            console.log('Real-time position:', lat, lon, `Accuracy: ±${accuracy} meters`);
+                            updateCoordinates(lat, lon, accuracy);
                         },
                         (error) => {
+                            console.error('Geolocation error:', error);
                             alert('Unable to retrieve location: ' + error.message);
+                            if (watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
+                            }
+                            isTracking = false;
+                            updateButtonText();
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
                         }
                     );
-                } else {
-                    alert('Geolocation is not supported by this browser.');
+                    isTracking = true;
+                    updateButtonText();
+                    alert('Location tracking started.');
                 }
             });
 
@@ -420,6 +483,20 @@
                 } catch (error) {
                     alert(error.message);
                 }
+            });
+
+            // Download tiles button (redundant with tileControl, but kept for explicit UI)
+            downloadTilesBtn.addEventListener('click', () => {
+                const bounds = map.getBounds();
+                const zoomLevels = [map.getZoom()];
+                osmLayer.saveTiles(zoomLevels, {
+                    confirm: (layer, successCallback) => {
+                        if (window.confirm(`Download ${layer._tilesforSave.length} tiles for the current view?`)) {
+                            successCallback();
+                        }
+                    }
+                });
+                alert('Starting tile download for current view. Check the save tiles control to monitor progress.');
             });
 
             const gpsControl = L.Control.extend({
@@ -444,8 +521,9 @@
                                 (position) => {
                                     const lat = position.coords.latitude;
                                     const lon = position.coords.longitude;
+                                    const accuracy = position.coords.accuracy;
                                     map.setView([lat, lon], 12);
-                                    updateCoordinates(lat, lon);
+                                    updateCoordinates(lat, lon, accuracy);
                                 },
                                 (error) => {
                                     alert('Unable to access GPS: ' + error.message);
@@ -461,6 +539,7 @@
             });
 
             map.addControl(new gpsControl());
+            updateButtonText();
         });
     </script>
 </body>
