@@ -109,6 +109,21 @@
             display: flex;
             flex-wrap: wrap;
         }
+        /* Style for Leaflet layer control to match theme */
+        .leaflet-control-layers {
+            background-color: #2e4a2e;
+            color: #ffffff;
+            border: 2px solid #4b704b;
+            border-radius: 5px;
+        }
+        .leaflet-control-layers label {
+            color: #d4d4d4;
+        }
+        .leaflet-control-layers select, .leaflet-control-layers input {
+            background-color: #3c573c;
+            color: #ffffff;
+            border: 1px solid #4b704b;
+        }
     </style>
 </head>
 <body>
@@ -159,9 +174,32 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const map = L.map('map').setView([9.0765, 7.3986], 6);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
+
+            // Define basemaps
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            });
+
+            const esriSatellite = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                    maxZoom: 19
+                }
+            );
+
+            // Add default basemap (OSM) to map
+            osmLayer.addTo(map);
+
+            // Create basemap control
+            const baseMaps = {
+                "OpenStreetMap": osmLayer,
+                "Satellite Imagery": esriSatellite
+            };
+
+            // Add layer control to switch basemaps
+            L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
             let marker = null;
 
