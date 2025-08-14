@@ -35,7 +35,7 @@
             margin: 20px 0;
         }
         #map.picking-mode {
-            cursor: crosshair; /* Changes cursor to crosshair when picking */
+            cursor: crosshair;
         }
         .controls {
             background-color: #2e4a2e;
@@ -64,13 +64,18 @@
             width: 100px;
             color: #d4d4d4;
         }
-        input {
+        select, input {
             padding: 5px;
             background-color: #3c573c;
             border: 1px solid #4b704b;
             color: #ffffff;
-            width: 150px;
             margin-right: 10px;
+        }
+        select {
+            width: 200px;
+        }
+        input {
+            width: 150px;
         }
         .output {
             margin-top: 20px;
@@ -87,6 +92,10 @@
             font-weight: bold;
             color: #e6e6e6;
         }
+        #inputFields {
+            display: flex;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -99,12 +108,25 @@
             <button id="getLocationBtn">Use My Current Location</button>
             <button id="getCoordinateBtn">Get Coordinate from Map</button>
             <div class="input-group">
-                <label for="latInput">Latitude:</label>
-                <input type="text" id="latInput" placeholder="e.g., 9.0765" />
-                <label for="lonInput">Longitude:</label>
-                <input type="text" id="lonInput" placeholder="e.g., 7.3986" />
-                <button id="convertInputBtn">Convert Input</button>
+                <label for="coordSystem">Coordinate System:</label>
+                <select id="coordSystem">
+                    <option value="dd">Decimal Degrees (DD)</option>
+                    <option value="ddm">Degrees and Decimal Minutes (DDM)</option>
+                    <option value="dms">Degrees, Minutes, Seconds (DMS)</option>
+                    <option value="utm">Universal Transverse Mercator (UTM)</option>
+                    <option value="usng">United States National Grid (USNG)</option>
+                    <option value="maidenhead">Maidenhead Locator System</option>
+                    <option value="pluscodes" disabled>Plus Codes (Open Location Code)</option>
+                    <option value="what3words" disabled>What3words</option>
+                    <option value="georef" disabled>GEOREF</option>
+                    <option value="spcs" disabled>State Plane Coordinate System (SPCS)</option>
+                    <option value="osgb36" disabled>British National Grid (OSGB36)</option>
+                </select>
             </div>
+            <div class="input-group" id="inputFields">
+                <!-- Dynamic input fields will be injected here -->
+            </div>
+            <button id="convertInputBtn">Convert Input</button>
             <div class="output">
                 <h3>Coordinates</h3>
                 <p><strong>MGRS:</strong> <span id="mgrsOutput">Click a button to get coordinates</span></p>
@@ -115,6 +137,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
     <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/latlon-ellipsoidal.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/mgrs.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/utm.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/dms.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const map = L.map('map').setView([9.0765, 7.3986], 6);
@@ -123,6 +149,153 @@
             }).addTo(map);
 
             let marker = null;
+
+            const coordSystemSelect = document.getElementById('coordSystem');
+            const inputFieldsDiv = document.getElementById('inputFields');
+
+            function updateInputFields() {
+                const system = coordSystemSelect.value;
+                inputFieldsDiv.innerHTML = '';
+
+                if (system === 'dd') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="latInput">Latitude:</label>
+                        <input type="text" id="latInput" placeholder="e.g., 9.0765" />
+                        <label for="lonInput">Longitude:</label>
+                        <input type="text" id="lonInput" placeholder="e.g., 7.3986" />
+                    `;
+                } else if (system === 'ddm') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="latDeg">Lat Degrees:</label>
+                        <input type="text" id="latDeg" placeholder="e.g., 9" />
+                        <label for="latMin">Minutes:</label>
+                        <input type="text" id="latMin" placeholder="e.g., 4.59" />
+                        <label for="latDir">Direction:</label>
+                        <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
+                        <label for="lonDeg">Lon Degrees:</label>
+                        <input type="text" id="lonDeg" placeholder="e.g., 7" />
+                        <label for="lonMin">Minutes:</label>
+                        <input type="text" id="lonMin" placeholder="e.g., 23.916" />
+                        <label for="lonDir">Direction:</label>
+                        <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
+                    `;
+                } else if (system === 'dms') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="latDeg">Lat Degrees:</label>
+                        <input type="text" id="latDeg" placeholder="e.g., 9" />
+                        <label for="latMin">Minutes:</label>
+                        <input type="text" id="latMin" placeholder="e.g., 4" />
+                        <label for="latSec">Seconds:</label>
+                        <input type="text" id="latSec" placeholder="e.g., 35.4" />
+                        <label for="latDir">Direction:</label>
+                        <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
+                        <label for="lonDeg">Lon Degrees:</label>
+                        <input type="text" id="lonDeg" placeholder="e.g., 7" />
+                        <label for="lonMin">Minutes:</label>
+                        <input type="text" id="lonMin" placeholder="e.g., 23" />
+                        <label for="lonSec">Seconds:</label>
+                        <input type="text" id="lonSec" placeholder="e.g., 54.96" />
+                        <label for="lonDir">Direction:</label>
+                        <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
+                    `;
+                } else if (system === 'utm') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="zone">Zone:</label>
+                        <input type="text" id="zone" placeholder="e.g., 32" />
+                        <label for="easting">Easting:</label>
+                        <input type="text" id="easting" placeholder="e.g., 609517" />
+                        <label for="northing">Northing:</label>
+                        <input type="text" id="northing" placeholder="e.g., 1002972" />
+                        <label for="hemisphere">Hemisphere:</label>
+                        <select id="hemisphere"><option value="N">Northern</option><option value="S">Southern</option></select>
+                    `;
+                } else if (system === 'usng') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="usngInput">USNG:</label>
+                        <input type="text" id="usngInput" placeholder="e.g., 32NPA0950010297" style="width: 300px;" />
+                    `;
+                } else if (system === 'maidenhead') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="maidenheadInput">Maidenhead:</label>
+                        <input type="text" id="maidenheadInput" placeholder="e.g., JJ52QH" style="width: 300px;" />
+                    `;
+                } else {
+                    inputFieldsDiv.innerHTML = `<p style="color: #ff6666;">This coordinate system requires external API integration.</p>`;
+                }
+            }
+
+            coordSystemSelect.addEventListener('change', updateInputFields);
+            updateInputFields(); // Initialize input fields
+
+            function parseCoordinateInput() {
+                const system = coordSystemSelect.value;
+                let lat, lon;
+
+                try {
+                    if (system === 'dd') {
+                        lat = parseFloat(document.getElementById('latInput').value);
+                        lon = parseFloat(document.getElementById('lonInput').value);
+                        if (isNaN(lat) || isNaN(lon)) throw new Error('Invalid DD coordinates');
+                    } else if (system === 'ddm') {
+                        const latDeg = parseFloat(document.getElementById('latDeg').value);
+                        const latMin = parseFloat(document.getElementById('latMin').value);
+                        const latDir = document.getElementById('latDir').value;
+                        const lonDeg = parseFloat(document.getElementById('lonDeg').value);
+                        const lonMin = parseFloat(document.getElementById('lonMin').value);
+                        const lonDir = document.getElementById('lonDir').value;
+                        if (isNaN(latDeg) || isNaN(latMin) || isNaN(lonDeg) || isNaN(lonMin)) {
+                            throw new Error('Invalid DDM coordinates');
+                        }
+                        lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latDir}`, 'dms');
+                        lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonDir}`, 'dms');
+                    } else if (system === 'dms') {
+                        const latDeg = parseFloat(document.getElementById('latDeg').value);
+                        const latMin = parseFloat(document.getElementById('latMin').value);
+                        const latSec = parseFloat(document.getElementById('latSec').value);
+                        const latDir = document.getElementById('latDir').value;
+                        const lonDeg = parseFloat(document.getElementById('lonDeg').value);
+                        const lonMin = parseFloat(document.getElementById('lonMin').value);
+                        const lonSec = parseFloat(document.getElementById('lonSec').value);
+                        const lonDir = document.getElementById('lonDir').value;
+                        if (isNaN(latDeg) || isNaN(latMin) || isNaN(latSec) || isNaN(lonDeg) || isNaN(lonMin) || isNaN(lonSec)) {
+                            throw new Error('Invalid DMS coordinates');
+                        }
+                        lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latSec} ${latDir}`, 'dms');
+                        lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonSec} ${lonDir}`, 'dms');
+                    } else if (system === 'utm') {
+                        const zone = parseInt(document.getElementById('zone').value);
+                        const easting = parseFloat(document.getElementById('easting').value);
+                        const northing = parseFloat(document.getElementById('northing').value);
+                        const hemisphere = document.getElementById('hemisphere').value;
+                        if (isNaN(zone) || isNaN(easting) || isNaN(northing)) {
+                            throw new Error('Invalid UTM coordinates');
+                        }
+                        const utm = new Geodesy.Utm(zone, hemisphere, easting, northing);
+                        const latLon = utm.toLatLon();
+                        lat = latLon.lat;
+                        lon = latLon.lon;
+                    } else if (system === 'usng') {
+                        const usngStr = document.getElementById('usngInput').value.trim();
+                        const mgrs = Geodesy.Mgrs.parse(usngStr);
+                        const latLon = mgrs.toUtm().toLatLon();
+                        lat = latLon.lat;
+                        lon = latLon.lon;
+                    } else if (system === 'maidenhead') {
+                        const maidenhead = document.getElementById('maidenheadInput').value.trim().toUpperCase();
+                        if (!/^[A-R]{2}[0-9]{2}[A-X]{2}$/.test(maidenhead)) {
+                            throw new Error('Invalid Maidenhead locator');
+                        }
+                        const lon = (maidenhead.charCodeAt(0) - 65) * 20 - 180 + (parseInt(maidenhead[2]) * 2) + (maidenhead.charCodeAt(4) - 65) * 0.083333;
+                        const lat = (maidenhead.charCodeAt(1) - 65) * 10 - 90 + parseInt(maidenhead[3]) + (maidenhead.charCodeAt(5) - 65) * 0.041667;
+                        return { lat, lon };
+                    } else {
+                        throw new Error('Selected coordinate system is not supported for conversion.');
+                    }
+                    return { lat, lon };
+                } catch (error) {
+                    throw new Error(`Parsing error: ${error.message}`);
+                }
+            }
 
             function updateCoordinates(lat, lon) {
                 if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
@@ -150,8 +323,7 @@
                     } else {
                         marker = L.marker([latNum, lonNum]).addTo(map);
                     }
-                    map.setView([latNum, lonNum], map.getZoom()); // Preserve current zoom level
-                    // Revert cursor after coordinate is picked
+                    map.setView([latNum, lonNum], map.getZoom());
                     map.getContainer().classList.remove('picking-mode');
                 } catch (error) {
                     console.error('MGRS conversion error:', error);
@@ -179,25 +351,22 @@
             });
 
             document.getElementById('getCoordinateBtn').addEventListener('click', () => {
-                // Activate picking mode with crosshair cursor
                 map.getContainer().classList.add('picking-mode');
                 map.once('click', (e) => {
                     const lat = e.latlng.lat;
                     const lon = e.latlng.lng;
                     updateCoordinates(lat, lon);
                 });
-                // Provide visual feedback to the user
                 alert('Click on the map to get coordinates.');
             });
 
             document.getElementById('convertInputBtn').addEventListener('click', () => {
-                const lat = parseFloat(document.getElementById('latInput').value);
-                const lon = parseFloat(document.getElementById('lonInput').value);
-                if (isNaN(lat) || isNaN(lon)) {
-                    alert('Please enter valid numeric coordinates.');
-                    return;
+                try {
+                    const { lat, lon } = parseCoordinateInput();
+                    updateCoordinates(lat, lon);
+                } catch (error) {
+                    alert(error.message);
                 }
-                updateCoordinates(lat, lon);
             });
 
             const gpsControl = L.Control.extend({
