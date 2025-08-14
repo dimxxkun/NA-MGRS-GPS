@@ -201,6 +201,7 @@
             let marker = null;
             let watchId = null;
             let isTracking = false;
+            let wasTracking = false; // Track if tracking was active before pausing
 
             const coordSystemSelect = document.getElementById('coordSystem');
             const inputFieldsDiv = document.getElementById('inputFields');
@@ -438,19 +439,45 @@
             });
 
             document.getElementById('selectEnemyBtn').addEventListener('click', () => {
+                // Pause tracking if active
+                if (isTracking && watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                    wasTracking = true; // Remember tracking was active
+                    isTracking = false;
+                    updateButtonText();
+                    alert('Location tracking paused to select enemy coordinates.');
+                } else {
+                    wasTracking = false; // Tracking was not active
+                }
+
                 map.getContainer().classList.add('picking-mode');
                 map.once('click', (e) => {
                     const lat = e.latlng.lat;
                     const lon = e.latlng.lng;
                     updateCoordinates(lat, lon);
+                    alert('Enemy coordinates selected. Click "Start Tracking Location" to resume GPS tracking if needed.');
                 });
                 alert('Click on the map to select enemy coordinates.');
             });
 
             document.getElementById('convertInputBtn').addEventListener('click', () => {
+                // Pause tracking if active
+                if (isTracking && watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                    wasTracking = true; // Remember tracking was active
+                    isTracking = false;
+                    updateButtonText();
+                    alert('Location tracking paused to convert input coordinates.');
+                } else {
+                    wasTracking = false; // Tracking was not active
+                }
+
                 try {
                     const { lat, lon } = parseCoordinateInput();
                     updateCoordinates(lat, lon);
+                    alert('Coordinates converted. Click "Start Tracking Location" to resume GPS tracking if needed.');
                 } catch (error) {
                     alert(error.message);
                 }
@@ -474,6 +501,18 @@
 
                     container.onclick = function () {
                         if (navigator.geolocation) {
+                            // Pause tracking if active
+                            if (isTracking && watchId !== null) {
+                                navigator.geolocation.clearWatch(watchId);
+                                watchId = null;
+                                wasTracking = true; // Remember tracking was active
+                                isTracking = false;
+                                updateButtonText();
+                                alert('Location tracking paused to zoom to current location.');
+                            } else {
+                                wasTracking = false; // Tracking was not active
+                            }
+
                             navigator.geolocation.getCurrentPosition(
                                 (position) => {
                                     const lat = position.coords.latitude;
@@ -481,6 +520,7 @@
                                     const accuracy = position.coords.accuracy;
                                     map.setView([lat, lon], 12);
                                     updateCoordinates(lat, lon, accuracy);
+                                    alert('Zoomed to current location. Click "Start Tracking Location" to resume GPS tracking if needed.');
                                 },
                                 (error) => {
                                     alert('Unable to access GPS: ' + error.message);
