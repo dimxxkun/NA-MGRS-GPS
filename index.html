@@ -145,11 +145,7 @@
                     <option value="utm">Universal Transverse Mercator (UTM)</option>
                     <option value="usng">United States National Grid (USNG)</option>
                     <option value="maidenhead">Maidenhead Locator System</option>
-                    <option value="pluscodes" disabled>Plus Codes (Open Location Code)</option>
-                    <option value="what3words" disabled>What3words</option>
-                    <option value="georef" disabled>GEOREF</option>
-                    <option value="spcs" disabled>State Plane Coordinate System (SPCS)</option>
-                    <option value="osgb36" disabled>British National Grid (OSGB36)</option>
+                    <option value="pluscodes">Plus Codes (Open Location Code)</option>
                 </select>
             </div>
             <div class="input-group" id="inputFields">
@@ -171,7 +167,9 @@
     <script src="https://unpkg.com/geodesy@2.2.1/mgrs.js"></script>
     <script src="https://unpkg.com/geodesy@2.2.1/utm.js"></script>
     <script src="https://unpkg.com/geodesy@2.2.1/dms.js"></script>
+    <script src="https://unpkg.com/openlocationcode@1.0.4/openlocationcode.js"></script>
     <script>
+        // Signature: dimxxkun
         document.addEventListener('DOMContentLoaded', () => {
             const map = L.map('map').setView([9.0765, 7.3986], 6);
 
@@ -292,8 +290,11 @@
                         <label for="maidenheadInput">Maidenhead:</label>
                         <input type="text" id="maidenheadInput" placeholder="e.g., JJ52QH" style="width: 300px;" />
                     `;
-                } else {
-                    inputFieldsDiv.innerHTML = `<p style="color: #ff6666;">This coordinate system requires external API integration.</p>`;
+                } else if (system === 'pluscodes') {
+                    inputFieldsDiv.innerHTML = `
+                        <label for="plusCodeInput">Plus Code:</label>
+                        <input type="text" id="plusCodeInput" placeholder="e.g., 6GCRPR6C+2F" style="width: 300px;" />
+                    `;
                 }
             }
 
@@ -361,8 +362,14 @@
                         const lon = (maidenhead.charCodeAt(0) - 65) * 20 - 180 + (parseInt(maidenhead[2]) * 2) + (maidenhead.charCodeAt(4) - 65) * 0.083333;
                         const lat = (maidenhead.charCodeAt(1) - 65) * 10 - 90 + parseInt(maidenhead[3]) + (maidenhead.charCodeAt(5) - 65) * 0.041667;
                         return { lat, lon };
-                    } else {
-                        throw new Error('Selected coordinate system is not supported for conversion.');
+                    } else if (system === 'pluscodes') {
+                        const plusCode = document.getElementById('plusCodeInput').value.trim();
+                        if (!OpenLocationCode.isValid(plusCode)) {
+                            throw new Error('Invalid Plus Code');
+                        }
+                        const decoded = OpenLocationCode.decode(plusCode);
+                        lat = decoded.latitudeCenter;
+                        lon = decoded.longitudeCenter;
                     }
                     return { lat, lon };
                 } catch (error) {
@@ -524,7 +531,7 @@
                                     const lat = position.coords.latitude;
                                     const lon = position.coords.longitude;
                                     const accuracy = position.coords.accuracy;
-                                    map.setView([lat, lon], 15); // Increased zoom level to 15
+                                    map.setView([lat, lon], 15);
                                     updateCoordinates(lat, lon, accuracy, true);
                                 },
                                 (error) => {
