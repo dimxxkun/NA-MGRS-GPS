@@ -120,12 +120,21 @@
             </div>
             <div class="output">
                 <h3>Coordinates</h3>
-                <p><strong>MGRS:</strong> <button class="copy-btn" onclick="copyToClipboard('mgrsOutput')">📋</button> <span id="mgrsOutput">Click a button to get coordinates</span></p>
-                <p><strong>Lat/Long:</strong> <button class="copy-btn" onclick="copyToClipboard('latLonOutput')">📋</button> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p>
+                    <strong>MGRS:</strong>
+                    <button id="copyMgrsBtn" class="copy-btn">📋</button>
+                    <span id="mgrsOutput">Click a button to get coordinates</span>
+                </p>
+                <p>
+                    <strong>Lat/Long:</strong>
+                    <button id="copyLatLonBtn" class="copy-btn">📋</button>
+                    <span id="latLonOutput">Click a button to get coordinates</span>
+                </p>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
             </div>
         </div>
     </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
     <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
@@ -134,52 +143,34 @@
         document.addEventListener('DOMContentLoaded', () => {
             const map = L.map('map').setView([9.0765, 7.3986], 6);
 
-            // Define basemaps
+            // Basemaps
             const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                attribution: '&copy; OpenStreetMap contributors',
                 maxZoom: 19
             });
-
             const esriSatellite = L.tileLayer(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                    attribution: 'Tiles © Esri, USGS, USDA, and others',
                     maxZoom: 19
                 }
             );
-
             osmLayer.addTo(map);
+            L.control.layers({ "OpenStreetMap": osmLayer, "Satellite Imagery": esriSatellite }, null, { position: 'topright' }).addTo(map);
 
-            const baseMaps = {
-                "OpenStreetMap": osmLayer,
-                "Satellite Imagery": esriSatellite
-            };
-
-            L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
-
-            // Define marker icons
+            // Marker icons
             const gpsIcon = new L.Icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
                 shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
             });
-
             const enemyIcon = new L.Icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
                 shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
             });
 
-            let marker = null;
-            let watchId = null;
-            let isTracking = false;
-
+            let marker = null, watchId = null, isTracking = false;
             const getLocationBtn = document.getElementById('getLocationBtn');
 
             function updateButtonText() {
@@ -187,22 +178,9 @@
             }
 
             function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
-                if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-                    document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
-                    document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
-                    document.getElementById('accuracyOutput').textContent = 'N/A';
-                    alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
-                    return;
-                }
-
                 try {
                     const lonNum = parseFloat(lon);
                     const latNum = parseFloat(lat);
-
-                    if (typeof proj4 === 'undefined' || typeof proj4.mgrs === 'undefined') {
-                        throw new Error('MGRS library failed to load');
-                    }
-
                     const mgrs = proj4.mgrs.forward([lonNum, latNum]);
                     const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
                     document.getElementById('mgrsOutput').textContent = mgrs;
@@ -210,8 +188,7 @@
                     document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
 
                     if (marker) {
-                        marker.setLatLng([latNum, lonNum]);
-                        marker.setIcon(isGps ? gpsIcon : enemyIcon);
+                        marker.setLatLng([latNum, lonNum]).setIcon(isGps ? gpsIcon : enemyIcon);
                     } else {
                         marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
                     }
@@ -219,122 +196,76 @@
                     map.getContainer().classList.remove('picking-mode');
                 } catch (error) {
                     console.error('MGRS conversion error:', error);
-                    document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
-                    document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-                    document.getElementById('accuracyOutput').textContent = 'N/A';
                 }
             }
 
+            // Tracking button
             getLocationBtn.addEventListener('click', () => {
                 if (!navigator.geolocation) {
-                    alert('Geolocation is not supported by this browser.');
+                    alert('Geolocation not supported.');
                     return;
                 }
-
                 if (isTracking) {
-                    if (watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
-                    }
-                    isTracking = false;
-                    updateButtonText();
+                    if (watchId) navigator.geolocation.clearWatch(watchId);
+                    watchId = null; isTracking = false; updateButtonText();
                 } else {
                     watchId = navigator.geolocation.watchPosition(
-                        (position) => {
-                            const lat = position.coords.latitude;
-                            const lon = position.coords.longitude;
-                            const accuracy = position.coords.accuracy;
-                            console.log('Real-time position:', lat, lon, `Accuracy: ±${accuracy} meters`);
-                            updateCoordinates(lat, lon, accuracy, true);
-                        },
-                        (error) => {
-                            console.error('Geolocation error:', error);
-                            alert('Unable to retrieve location: ' + error.message);
-                            if (watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
-                                watchId = null;
-                            }
-                            isTracking = false;
-                            updateButtonText();
-                        },
-                        {
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0
-                        }
+                        pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+                        err => { alert('Location error: ' + err.message); isTracking = false; updateButtonText(); },
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
-                    isTracking = true;
-                    updateButtonText();
+                    isTracking = true; updateButtonText();
                 }
             });
 
+            // Enemy coordinates selection
             document.getElementById('selectEnemyBtn').addEventListener('click', () => {
-                if (isTracking && watchId !== null) {
+                if (isTracking && watchId) {
                     navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                    isTracking = false;
-                    updateButtonText();
+                    watchId = null; isTracking = false; updateButtonText();
                 }
-
                 map.getContainer().classList.add('picking-mode');
-                map.once('click', (e) => {
-                    const lat = e.latlng.lat;
-                    const lon = e.latlng.lng;
-                    updateCoordinates(lat, lon, null, false);
-                });
+                map.once('click', e => updateCoordinates(e.latlng.lat, e.latlng.lng, null, false));
                 alert('Click the map to select enemy coordinates.');
             });
 
+            // GPS zoom control
             const gpsControl = L.Control.extend({
                 options: { position: 'topleft' },
-                onAdd: function (map) {
+                onAdd: () => {
                     const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
                     container.innerHTML = '📍';
                     container.title = 'Zoom to your GPS location';
-                    container.style.backgroundColor = '#4b704b';
-                    container.style.width = '34px';
-                    container.style.height = '34px';
-                    container.style.display = 'flex';
-                    container.style.justifyContent = 'center';
-                    container.style.alignItems = 'center';
-                    container.style.cursor = 'pointer';
-                    container.style.fontSize = '18px';
-                    container.style.color = 'white';
-
-                    container.onclick = function () {
+                    Object.assign(container.style, {
+                        backgroundColor: '#4b704b', width: '34px', height: '34px',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        cursor: 'pointer', fontSize: '18px', color: 'white'
+                    });
+                    container.onclick = () => {
                         if (navigator.geolocation) {
                             navigator.geolocation.getCurrentPosition(
-                                (position) => {
-                                    const lat = position.coords.latitude;
-                                    const lon = position.coords.longitude;
-                                    const accuracy = position.coords.accuracy;
-                                    map.setView([lat, lon], 15);
-                                    updateCoordinates(lat, lon, accuracy, true);
-                                },
-                                (error) => {
-                                    alert('Unable to access GPS: ' + error.message);
-                                }
+                                pos => { map.setView([pos.coords.latitude, pos.coords.longitude], 15); updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true); },
+                                err => alert('Unable to access GPS: ' + err.message)
                             );
-                        } else {
-                            alert('Geolocation not supported.');
                         }
                     };
-
                     return container;
                 }
             });
-
             map.addControl(new gpsControl());
             updateButtonText();
 
-            function copyToClipboard(elementId) {
+            // --- Copy to Clipboard with ✅ feedback ---
+            function copyToClipboard(elementId, buttonEl) {
                 const text = document.getElementById(elementId).textContent;
                 navigator.clipboard.writeText(text).then(() => {
-                    alert('Copied to clipboard!');
-                }).catch(err => {
-                    alert('Failed to copy: ' + err);
-                });
+                    const oldText = buttonEl.textContent;
+                    buttonEl.textContent = "✅";
+                    setTimeout(() => buttonEl.textContent = oldText, 1000);
+                }).catch(err => alert('Copy failed: ' + err));
             }
+            document.getElementById('copyMgrsBtn').addEventListener('click', e => copyToClipboard('mgrsOutput', e.target));
+            document.getElementById('copyLatLonBtn').addEventListener('click', e => copyToClipboard('latLonOutput', e.target));
         });
     </script>
 </body>
