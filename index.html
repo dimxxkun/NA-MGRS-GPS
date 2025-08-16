@@ -109,7 +109,13 @@
             <div class="output">
                 <h3>Coordinates</h3>
                 <p><strong>MGRS:</strong> <span id="mgrsOutput">Click a button to get coordinates</span></p>
-                <p><strong>Lat/Long:</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p><strong>Lat/Long (DD):</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p><strong>DDM:</strong> <span id="ddmOutput">Click a button to get coordinates</span></p>
+                <p><strong>DMS:</strong> <span id="dmsOutput">Click a button to get coordinates</span></p>
+                <p><strong>UTM:</strong> <span id="utmOutput">Click a button to get coordinates</span></p>
+                <p><strong>USNG:</strong> <span id="usngOutput">Click a button to get coordinates</span></p>
+                <p><strong>Maidenhead:</strong> <span id="maidenheadOutput">Click a button to get coordinates</span></p>
+                <p><strong>Plus Codes:</strong> <span id="plusCodesOutput">Click a button to get coordinates</span></p>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
             </div>
         </div>
@@ -117,6 +123,11 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
     <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/latlon-ellipsoidal.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/mgrs.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/utm.js"></script>
+    <script src="https://unpkg.com/geodesy@2.2.1/dms.js"></script>
+    <script src="https://unpkg.com/openlocationcode@1.0.4/openlocationcode.js"></script>
     <script>
         // Signature: dimxxkun
         document.addEventListener('DOMContentLoaded', () => {
@@ -175,6 +186,12 @@
                 if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
                     document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
                     document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('ddmOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('dmsOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('utmOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('usngOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('maidenheadOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('plusCodesOutput').textContent = 'Invalid coordinates';
                     document.getElementById('accuracyOutput').textContent = 'N/A';
                     alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
                     return;
@@ -188,10 +205,57 @@
                         throw new Error('MGRS library failed to load');
                     }
 
+                    // MGRS
                     const mgrs = proj4.mgrs.forward([lonNum, latNum]);
+
+                    // Decimal Degrees (DD)
                     const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
+
+                    // Degrees and Decimal Minutes (DDM)
+                    const latLonPoint = new Geodesy.LatLonEllipsoidal(latNum, lonNum);
+                    const ddmLat = Geodesy.Dms.toDms(latNum, 'dm', 3, 'lat');
+                    const ddmLon = Geodesy.Dms.toDms(lonNum, 'dm', 3, 'lon');
+                    const ddm = `${ddmLat}, ${ddmLon}`;
+
+                    // Degrees, Minutes, Seconds (DMS)
+                    const dmsLat = Geodesy.Dms.toDms(latNum, 'dms', 1, 'lat');
+                    const dmsLon = Geodesy.Dms.toDms(lonNum, 'dms', 1, 'lon');
+                    const dms = `${dmsLat}, ${dmsLon}`;
+
+                    // UTM
+                    const utm = latLonPoint.toUtm();
+                    const utmStr = `${utm.zone}${utm.hemisphere} ${utm.easting.toFixed(0)}E ${utm.northing.toFixed(0)}N`;
+
+                    // USNG (same as MGRS for display, as USNG is based on MGRS)
+                    const usng = mgrs;
+
+                    // Maidenhead Locator System
+                    const lonToMaidenhead = (lon) => {
+                        const lonField = Math.floor((lon + 180) / 20);
+                        const lonSquare = Math.floor(((lon + 180) % 20) / 2);
+                        const lonSubsquare = Math.floor(((lon + 180) % 2) / 0.083333);
+                        return String.fromCharCode(65 + lonField) + String.fromCharCode(65 + lonSubsquare);
+                    };
+                    const latToMaidenhead = (lat) => {
+                        const latField = Math.floor((lat + 90) / 10);
+                        const latSquare = Math.floor(((lat + 90) % 10));
+                        const latSubsquare = Math.floor(((lat + 90) % 1) / 0.041667);
+                        return String.fromCharCode(65 + latField) + String.fromCharCode(65 + latSubsquare);
+                    };
+                    const maidenhead = `${lonToMaidenhead(lonNum)}${latToMaidenhead(latNum)}${lonNum.toFixed(1).slice(-1)}${latNum.toFixed(1).slice(-1)}`;
+
+                    // Plus Codes
+                    const plusCode = OpenLocationCode.encode(latNum, lonNum, 10);
+
+                    // Update output display
                     document.getElementById('mgrsOutput').textContent = mgrs;
                     document.getElementById('latLonOutput').textContent = latLon;
+                    document.getElementById('ddmOutput').textContent = ddm;
+                    document.getElementById('dmsOutput').textContent = dms;
+                    document.getElementById('utmOutput').textContent = utmStr;
+                    document.getElementById('usngOutput').textContent = usng;
+                    document.getElementById('maidenheadOutput').textContent = maidenhead;
+                    document.getElementById('plusCodesOutput').textContent = plusCode;
                     document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
 
                     if (marker) {
@@ -203,9 +267,15 @@
                     map.setView([latNum, lonNum], map.getZoom());
                     map.getContainer().classList.remove('picking-mode');
                 } catch (error) {
-                    console.error('MGRS conversion error:', error);
-                    document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
+                    console.error('Coordinate conversion error:', error);
+                    document.getElementById('mgrsOutput').textContent = `Error: ${error.message}`;
                     document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                    document.getElementById('ddmOutput').textContent = `Error: ${error.message}`;
+                    document.getElementById('dmsOutput').textContent = `Error: ${error.message}`;
+                    document.getElementById('utmOutput').textContent = `Error: ${error.message}`;
+                    document.getElementById('usngOutput').textContent = `Error: ${error.message}`;
+                    document.getElementById('maidenheadOutput').textContent = `Error: ${error.message}`;
+                    document.getElementById('plusCodesOutput').textContent = `Error: ${error.message}`;
                     document.getElementById('accuracyOutput').textContent = 'N/A';
                 }
             }
