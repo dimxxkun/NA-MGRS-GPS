@@ -62,10 +62,10 @@
         button:hover {
             background-color: #5a8a5a;
         }
-        #selectEnemyBtn {
+        #selectEnemyBtn, #clearEnemyBtn {
             background-color: #a00;
         }
-        #selectEnemyBtn:hover {
+        #selectEnemyBtn:hover, #clearEnemyBtn:hover {
             background-color: #c00;
         }
         .output {
@@ -117,6 +117,7 @@
             <div class="button-group">
                 <button id="getLocationBtn">Start Tracking Location</button>
                 <button id="selectEnemyBtn">Select Enemy Coordinates</button>
+                <button id="clearEnemyBtn">Clear Enemy Markers</button>
             </div>
             <div class="output">
                 <h3>Coordinates</h3>
@@ -179,6 +180,7 @@
 
             // Controls
             const getLocationBtn = document.getElementById('getLocationBtn');
+            const clearEnemyBtn = document.getElementById('clearEnemyBtn');
             const errorOutput = document.getElementById('errorOutput');
             let watchId = null, isTracking = false, isPaused = false;
 
@@ -186,57 +188,67 @@
             function updateButtonText() {
                 getLocationBtn.textContent = isTracking ? (isPaused ? 'Resume Tracking' : 'Pause Tracking') : 'Start Tracking Location';
             }
-            function setError(msg) { errorOutput.textContent = msg; setTimeout(()=> errorOutput.textContent='',4000); }
-            function updateCoordinates(lat, lon, accuracy=null, isGps=false) {
+            function setError(msg) { errorOutput.textContent = msg; setTimeout(() => errorOutput.textContent = '', 4000); }
+            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
                 const mgrs = proj4.mgrs.forward([lon, lat]);
                 document.getElementById('mgrsOutput').textContent = mgrs;
                 document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
                 document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : 'N/A';
                 document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
-                if(isGps) {
-                    if(gpsMarker) gpsMarker.setLatLng([lat,lon]);
-                    else gpsMarker = L.marker([lat,lon],{icon:gpsIcon}).addTo(map);
+                if (isGps) {
+                    if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
+                    else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
                 } else {
-                    L.marker([lat,lon],{icon:enemyIcon}).addTo(enemyLayer);
+                    L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
                 }
             }
             function startTracking() {
                 watchId = navigator.geolocation.watchPosition(
-                    pos => updateCoordinates(pos.coords.latitude,pos.coords.longitude,pos.coords.accuracy,true),
-                    err => { setError('Location error: '+err.message); stopTracking(); },
-                    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+                    pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+                    err => { setError('Location error: ' + err.message); stopTracking(); },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
-                isTracking=true; isPaused=false; updateButtonText();
+                isTracking = true; isPaused = false; updateButtonText();
             }
             function stopTracking() {
-                if(watchId) navigator.geolocation.clearWatch(watchId);
-                watchId=null; isTracking=false; isPaused=false; updateButtonText();
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                watchId = null; isTracking = false; isPaused = false; updateButtonText();
             }
 
             // GPS tracking button
-            getLocationBtn.addEventListener('click',()=>{
-                if(!navigator.geolocation){ setError('Geolocation not supported'); return; }
-                if(isTracking){ if(isPaused) startTracking(); else { navigator.geolocation.clearWatch(watchId); isPaused=true; updateButtonText(); } }
+            getLocationBtn.addEventListener('click', () => {
+                if (!navigator.geolocation) { setError('Geolocation not supported'); return; }
+                if (isTracking) { if (isPaused) startTracking(); else { navigator.geolocation.clearWatch(watchId); isPaused = true; updateButtonText(); } }
                 else startTracking();
             });
 
             // Enemy marker button
-            document.getElementById('selectEnemyBtn').addEventListener('click',()=>{
+            document.getElementById('selectEnemyBtn').addEventListener('click', () => {
                 stopTracking();
                 map.getContainer().classList.add('picking-mode');
                 setError('Click map to place enemy marker');
-                map.once('click',e=>{
-                    updateCoordinates(e.latlng.lat,e.latlng.lng,null,false);
+                map.once('click', e => {
+                    updateCoordinates(e.latlng.lat, e.latlng.lng, null, false);
                     map.getContainer().classList.remove('picking-mode');
                 });
             });
 
+            // Clear enemy markers button
+            clearEnemyBtn.addEventListener('click', () => {
+                enemyLayer.clearLayers();
+                document.getElementById('mgrsOutput').textContent = 'N/A';
+                document.getElementById('latLonOutput').textContent = 'N/A';
+                document.getElementById('accuracyOutput').textContent = 'N/A';
+                document.getElementById('timestampOutput').textContent = 'N/A';
+                setError('Enemy markers cleared');
+            });
+
             // Copy buttons
-            document.querySelectorAll('.copy-btn').forEach(btn=>{
-                btn.addEventListener('click',()=>{
-                    const target=document.getElementById(btn.dataset.target);
-                    navigator.clipboard.writeText(target.textContent).then(()=> setError('Copied!'));
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    navigator.clipboard.writeText(target.textContent).then(() => setError('Copied!'));
                 });
             });
 
