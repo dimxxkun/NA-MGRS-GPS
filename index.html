@@ -188,13 +188,20 @@
             }
 
             function toMaidenhead(lat, lon) {
-                const lonField = Math.floor((lon + 180) / 20);
-                const latField = Math.floor((lat + 90) / 10);
-                const lonSquare = Math.floor(((lon + 180) % 20) / 2);
-                const latSquare = Math.floor(((lat + 90) % 10));
-                const lonSubsquare = Math.floor((((lon + 180) % 2) / 0.083333));
-                const latSubsquare = Math.floor((((lat + 90) % 1) / 0.041667));
-                return `${String.fromCharCode(65 + lonField)}${String.fromCharCode(65 + latField)}${lonSquare}${latSquare}${String.fromCharCode(65 + lonSubsquare)}${String.fromCharCode(65 + latSubsquare)}`;
+                try {
+                    const lonField = Math.floor((lon + 180) / 20);
+                    const latField = Math.floor((lat + 90) / 10);
+                    const lonSquare = Math.floor(((lon + 180) % 20) / 2);
+                    const latSquare = Math.floor(((lat + 90) % 10));
+                    const lonSubsquare = Math.floor((((lon + 180) % 2) / 0.083333));
+                    const latSubsquare = Math.floor((((lat + 90) % 1) / 0.041667));
+                    const maidenhead = `${String.fromCharCode(65 + lonField)}${String.fromCharCode(65 + latField)}${lonSquare}${latSquare}${String.fromCharCode(65 + lonSubsquare)}${String.fromCharCode(65 + latSubsquare)}`;
+                    console.log(`Maidenhead conversion: lat=${lat}, lon=${lon} -> ${maidenhead}`);
+                    return maidenhead;
+                } catch (error) {
+                    console.error('Maidenhead conversion error:', error);
+                    return 'Conversion failed';
+                }
             }
 
             function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
@@ -212,72 +219,116 @@
                     return;
                 }
 
-                try {
-                    const lonNum = parseFloat(lon);
-                    const latNum = parseFloat(lat);
+                const latNum = parseFloat(lat);
+                const lonNum = parseFloat(lon);
+                console.log(`Updating coordinates: lat=${latNum}, lon=${lonNum}, accuracy=${accuracy}, isGps=${isGps}`);
 
-                    if (typeof proj4 === 'undefined' || typeof proj4.mgrs === 'undefined') {
-                        throw new Error('MGRS library failed to load');
+                // Decimal Degrees (DD)
+                document.getElementById('latLonOutput').textContent = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
+
+                // Check if Geodesy is loaded
+                if (typeof Geodesy === 'undefined') {
+                    console.error('Geodesy library not loaded');
+                    document.getElementById('ddmOutput').textContent = 'Geodesy library not loaded';
+                    document.getElementById('dmsOutput').textContent = 'Geodesy library not loaded';
+                    document.getElementById('utmOutput').textContent = 'Geodesy library not loaded';
+                    document.getElementById('usngOutput').textContent = 'Geodesy library not loaded';
+                    document.getElementById('mgrsOutput').textContent = 'Geodesy library not loaded';
+                } else {
+                    try {
+                        const latLonPoint = new Geodesy.LatLonEllipsoidal(latNum, lonNum);
+
+                        // Degrees Decimal Minutes (DDM)
+                        try {
+                            const latDms = Geodesy.Dms.fromLat(latNum, 'dm', 3);
+                            const lonDms = Geodesy.Dms.fromLon(lonNum, 'dm', 3);
+                            document.getElementById('ddmOutput').textContent = `${latDms}, ${lonDms}`;
+                            console.log(`DDM: ${latDms}, ${lonDms}`);
+                        } catch (error) {
+                            console.error('DDM conversion error:', error);
+                            document.getElementById('ddmOutput').textContent = 'DDM conversion failed';
+                        }
+
+                        // Degrees Minutes Seconds (DMS)
+                        try {
+                            const latDmsFull = Geodesy.Dms.fromLat(latNum, 'dms', 2);
+                            const lonDmsFull = Geodesy.Dms.fromLon(lonNum, 'dms', 2);
+                            document.getElementById('dmsOutput').textContent = `${latDmsFull}, ${lonDmsFull}`;
+                            console.log(`DMS: ${latDmsFull}, ${lonDmsFull}`);
+                        } catch (error) {
+                            console.error('DMS conversion error:', error);
+                            document.getElementById('dmsOutput').textContent = 'DMS conversion failed';
+                        }
+
+                        // UTM
+                        try {
+                            const utm = latLonPoint.toUtm();
+                            document.getElementById('utmOutput').textContent = `${utm.zone}${utm.hemisphere} ${utm.easting.toFixed(0)} ${utm.northing.toFixed(0)}`;
+                            console.log(`UTM: ${utm.zone}${utm.hemisphere} ${utm.easting.toFixed(0)} ${utm.northing.toFixed(0)}`);
+                        } catch (error) {
+                            console.error('UTM conversion error:', error);
+                            document.getElementById('utmOutput').textContent = 'UTM conversion failed';
+                        }
+
+                        // MGRS
+                        try {
+                            const mgrs = latLonPoint.toUtm().toMgrs();
+                            document.getElementById('mgrsOutput').textContent = mgrs.toString();
+                            console.log(`MGRS: ${mgrs.toString()}`);
+                        } catch (error) {
+                            console.error('MGRS conversion error:', error);
+                            document.getElementById('mgrsOutput').textContent = 'MGRS conversion failed';
+                        }
+
+                        // USNG (using MGRS for approximation)
+                        try {
+                            const mgrs = latLonPoint.toUtm().toMgrs();
+                            document.getElementById('usngOutput').textContent = mgrs.toString();
+                            console.log(`USNG: ${mgrs.toString()}`);
+                        } catch (error) {
+                            console.error('USNG conversion error:', error);
+                            document.getElementById('usngOutput').textContent = 'USNG conversion failed';
+                        }
+                    } catch (error) {
+                        console.error('Geodesy conversion error:', error);
+                        document.getElementById('ddmOutput').textContent = 'Geodesy error';
+                        document.getElementById('dmsOutput').textContent = 'Geodesy error';
+                        document.getElementById('utmOutput').textContent = 'Geodesy error';
+                        document.getElementById('usngOutput').textContent = 'Geodesy error';
+                        document.getElementById('mgrsOutput').textContent = 'Geodesy error';
                     }
-
-                    // MGRS
-                    const mgrs = proj4.mgrs.forward([lonNum, latNum]);
-                    document.getElementById('mgrsOutput').textContent = mgrs;
-
-                    // Decimal Degrees (DD)
-                    const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
-                    document.getElementById('latLonOutput').textContent = latLon;
-
-                    // Degrees Decimal Minutes (DDM)
-                    const latDms = Geodesy.Dms.fromLat(latNum, 'dm', 3);
-                    const lonDms = Geodesy.Dms.fromLon(lonNum, 'dm', 3);
-                    document.getElementById('ddmOutput').textContent = `${latDms}, ${lonDms}`;
-
-                    // Degrees Minutes Seconds (DMS)
-                    const latDmsFull = Geodesy.Dms.fromLat(latNum, 'dms', 2);
-                    const lonDmsFull = Geodesy.Dms.fromLon(lonNum, 'dms', 2);
-                    document.getElementById('dmsOutput').textContent = `${latDmsFull}, ${lonDmsFull}`;
-
-                    // UTM
-                    const latLonPoint = new Geodesy.LatLonEllipsoidal(latNum, lonNum);
-                    const utm = latLonPoint.toUtm();
-                    document.getElementById('utmOutput').textContent = `${utm.zone}${utm.hemisphere} ${utm.easting.toFixed(0)} ${utm.northing.toFixed(0)}`;
-
-                    // USNG (approximated as MGRS for display)
-                    const mgrsObj = Geodesy.Mgrs.parse(mgrs);
-                    document.getElementById('usngOutput').textContent = mgrs;
-
-                    // Maidenhead
-                    const maidenhead = toMaidenhead(latNum, lonNum);
-                    document.getElementById('maidenheadOutput').textContent = maidenhead;
-
-                    // Plus Codes
-                    const plusCode = OpenLocationCode.encode(latNum, lonNum, OpenLocationCode.CODE_PRECISION_NORMAL);
-                    document.getElementById('pluscodesOutput').textContent = plusCode;
-
-                    // Accuracy
-                    document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
-
-                    if (marker) {
-                        marker.setLatLng([latNum, lonNum]);
-                        marker.setIcon(isGps ? gpsIcon : enemyIcon);
-                    } else {
-                        marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
-                    }
-                    map.setView([latNum, lonNum], map.getZoom());
-                    map.getContainer().classList.remove('picking-mode');
-                } catch (error) {
-                    console.error('Coordinate conversion error:', error);
-                    document.getElementById('mgrsOutput').textContent = `Conversion failed: ${error.message}`;
-                    document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-                    document.getElementById('ddmOutput').textContent = `Conversion failed`;
-                    document.getElementById('dmsOutput').textContent = `Conversion failed`;
-                    document.getElementById('utmOutput').textContent = `Conversion failed`;
-                    document.getElementById('usngOutput').textContent = `Conversion failed`;
-                    document.getElementById('maidenheadOutput').textContent = `Conversion failed`;
-                    document.getElementById('pluscodesOutput').textContent = `Conversion failed`;
-                    document.getElementById('accuracyOutput').textContent = 'N/A';
                 }
+
+                // Maidenhead
+                document.getElementById('maidenheadOutput').textContent = toMaidenhead(latNum, lonNum);
+
+                // Plus Codes
+                if (typeof OpenLocationCode === 'undefined') {
+                    console.error('OpenLocationCode library not loaded');
+                    document.getElementById('pluscodesOutput').textContent = 'OpenLocationCode library not loaded';
+                } else {
+                    try {
+                        const plusCode = OpenLocationCode.encode(latNum, lonNum, OpenLocationCode.CODE_PRECISION_NORMAL);
+                        document.getElementById('pluscodesOutput').textContent = plusCode;
+                        console.log(`Plus Codes: ${plusCode}`);
+                    } catch (error) {
+                        console.error('Plus Codes conversion error:', error);
+                        document.getElementById('pluscodesOutput').textContent = 'Plus Codes conversion failed';
+                    }
+                }
+
+                // Accuracy
+                document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
+
+                // Update marker
+                if (marker) {
+                    marker.setLatLng([latNum, lonNum]);
+                    marker.setIcon(isGps ? gpsIcon : enemyIcon);
+                } else {
+                    marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
+                }
+                map.setView([latNum, lonNum], map.getZoom());
+                map.getContainer().classList.remove('picking-mode');
             }
 
             getLocationBtn.addEventListener('click', () => {
