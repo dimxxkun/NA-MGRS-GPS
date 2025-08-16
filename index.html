@@ -1,341 +1,724 @@
-<!DOCTYPE html>
-<html lang="en">
+```html<!DOCTYPE
+<! html>
+<html langDOCTYPE html>
+<html lang="en="">
+<headen">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nigerian Army GPS Coordinate System</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    >
+    <meta charset="UTF-<meta charset="UTF-88">
+">
+    <meta name    <meta name="="viewport" content="widthviewport" content="width=device-width, initial=device-width, initial-scale=-scale=1.01.0">
+    <title>Nigerian Army GPS">
+    <title>Nigerian Army GPS Coordinate System</title Coordinate System</title>
+    <link rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg href="https://unpkg.com/leaflet@.com/leaflet@1.9.41.9.4/dist/leaflet/dist/leaflet.css.css" />
+   " />
     <style>
         body {
+>
+        body            margin {
             margin: 0;
-            font-family: 'Arial', sans-serif;
-            background-color: #1a2b1a;
-            color: #ffffff;
+           : font 0;
+            font-family: '-family: 'Arial', sans-serifArial', sans-serif;
+            background-color: #1;
+            background-color: #1a2b1aa2b1a;
+;
+            color: #ffffff            color: #ffffff;
+        }
+        .container;
         }
         .container {
-            max-width: 1200px;
+            max {
+            max-width: 1200px-width: 1200px;
+            margin: 0;
             margin: 0 auto;
-            padding: 20px;
+            padding auto;
+            padding: 20px: 20px;
+        }
+        header;
         }
         header {
+            text-align: center {
             text-align: center;
-            background-color: #2e4a2e;
+            background-color: #2;
+            background-color: #2e4a2ee4a2e;
             padding: 10px;
-            border-bottom: 2px solid #4b704b;
+            padding: 10px;
+            border-bottom;
+:             border-bottom: 2px solid2 #px4b solid #4b704b;
+        }
+       704b;
         }
         h1 {
+            margin: h1 {
             margin: 0;
-            font-size: 2em;
-            color: #d4d4d4;
+            font-size 0;
+            font-size: 2em: 2em;
+            color: #d;
+            color: #d4d4d4d4d4;
+            text-transform4;
             text-transform: uppercase;
         }
-        #map {
-            height: 500px;
-            border: 2px solid #4b704b;
-            margin: 20px 0;
+       : uppercase;
         }
-        #map.picking-mode {
+        #map {
+            height #map {
+            height: 500px;
+            border: 2px solid: 500px;
+            border: 2px solid #4b704b #4b704b;
+            margin:;
+ 20px            margin: 20px 0;
+ 0        }
+;
+        }
+        #map.p        #map.picking-mode {
+            cursor:icking-mode {
             cursor: crosshair;
         }
+        crosshair;
+        }
         .controls {
-            background-color: #2e4a2e;
+            background .controls {
+            background-color: #2-color: #2e4a2ee4a2e;
             padding: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius;
+            border-radius: 5px: 5px;
+            box-shadow: 0 ;
+            box-shadow: 0 0 10px rgba0 10px rgba(0, 0,(0, 0, 0, 0. 0, 0.5);
         }
-        .button-group {
-            display: flex;
-            justify-content: space-between;
+        .5);
+        }
+        .button-groupbutton-group {
+ {
+            display display: flex;
+            justify: flex;
+            justify-content: space: space-between;
+            align-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-items: center;
+            margin-bottom: 10px-bottom: 10px;
+;
         }
+        button        }
         button {
-            background-color: #4b704b;
+            background-color: # {
+            background-color: #4b704b4b704b;
+            color: #;
             color: #ffffff;
+            borderffffff;
             border: none;
-            padding: 10px 20px;
+            padding:: none;
+            padding:  10px10px  20px20px;
+            margin: 5;
             margin: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            transition: background-color 0.3s;
+            cursor:px;
+            pointer cursor: pointer;
+            font;
+            font-size: 1em-size: 1em;
+            transition;
+            transition: background-color 0: background-color 0.3s;
+        }
+.3s;
         }
         button:hover {
-            background-color: #5a8a5a;
+            background        button:hover {
+            background-color: #5-color: #5a8a5aa8a5a;
         }
-        #selectEnemyBtn {
-            background-color: #a00;
-            margin-left: auto;
+;
+               #select        #selectEnemyBtn {
+            background-colorEnemyBtn {
+            background-color: #a: #a00;
+            margin00;
+            margin-left: auto-left: auto;
         }
-        #selectEnemyBtn:hover {
+        #;
+        }
+        #selectEnemyBtn:hoverselectEnemyBtn:hover {
+            background-color: #c00 {
             background-color: #c00;
+;
         }
-        .output {
+        }
+        .       output .output {
+            margin-top:  {
             margin-top: 20px;
         }
-        .output h3 {
-            margin: 0 0 10px;
-            color: #d4d4d4;
+       20px;
         }
-        .output p {
-            margin: 5px 0;
-            font-size: 1.1em;
+        .output h .output h33 {
+            margin: 0 {
+            margin: 0 0 10 0 10pxpx;
+            color: #;
+            color: #d4d4d4d4d4d4;
         }
-        .output span {
-            font-weight: bold;
-            color: #e6e6e6;
+        .;
         }
-        .leaflet-control-layers {
-            background-color: #2e4a2e;
+        .outputoutput p p {
+            margin: 5 {
+            margin: 5px 0px ;
+            font0;
+            font-size: 1.1-size: 1.1em;
+       em }
+;
+               }
+ .        .output span {
+output span            font-weight            font-weight: bold;
+           : bold color;
+           : color: #e6e6e #e6e6e6;
+6       ;
+ }
+               . }
+        .leaflet-control-lleaflet-control-layers {
+            background-colorayers {
+            background-color: #2: #2e4a2ee4a2e;
             color: #ffffff;
-            border: 2px solid #4b704b;
-            border-radius: 5px;
+            color: #ffffff;
+            border: ;
+            border: 2px solid2px solid #4b #4b704bb;
+            border;
+-radius:             border-radius: 5px;
+5        }
+px;
+               }
+        .leaflet-control-l .leaflet-control-layers label {
+            color:ayers label {
+            color: # #d4d4d4dd4d4;
         }
-        .leaflet-control-layers label {
-            color: #d4d4d4;
+        .4;
         }
         .copy-btn {
+            background:copy-btn {
             background: none;
+            border: none none;
             border: none;
+            cursor;
             cursor: pointer;
-            font-size: 1em;
+            font-size: pointer;
+            font-size: 1em: 1em;
+            color: #;
             color: #ffffff;
-            margin-left: 5px;
-            padding: 0;
+            margin-leftffffff;
+            margin-left: 5: 5px;
+            paddingpx;
+            padding: 0:;
+         }
+0;
         }
-        .copy-btn:hover {
-            color: #5a8a5a;
+        .copy-btn:hover        .copy-btn:hover {
+            color {
+            color #:5 #5a8a5aa8a5a;
+        }
+    </style;
         }
     </style>
 </head>
 <body>
+</head>
+<body>
+    <div class="container>
     <div class="container">
+        <header">
         <header>
-            <h1>Nigerian Army Coordinate System</h1>
+            <h>
+           1 >N<h1>Nigerianigerian Army Coordinate Army Coordinate System</ System</hh11>
         </header>
-        <div id="map"></div>
+        <div>
+        </header>
+        <div id="map"></div id="map"></div>
+        <div class="controls>
         <div class="controls">
+            <div class="">
             <div class="button-group">
-                <button id="getLocationBtn">Start Tracking Location</button>
-                <button id="selectEnemyBtn">Select Enemy Coordinates</button>
+                <buttonbutton-group">
+                <button id="getLocationBtn"> id="getLocationBtn">Start Tracking Location</buttonStart Tracking Location</button>
+                <button id="select>
+                <button id="selectEnemyBtnEnemy">SelectBtn">Select Enemy Coordinates</button Enemy Coordinates</button>
             </div>
-            <div class="output">
-                <h3>Coordinates</h3>
-                <p><strong>MGRS:</strong> <button class="copy-btn" onclick="copyToClipboard('mgrsOutput')">📋</button> <span id="mgrsOutput">Click a button to get coordinates</span></p>
-                <p><strong>Lat/Long:</strong> <button class="copy-btn" onclick="copyToClipboard('latLonOutput')">📋</button> <span id="latLonOutput">Click a button to get coordinates</span></p>
-                <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
+            <div>
             </div>
-        </div>
+            <div class="output class="output">
+                <h3>Coordinates">
+                <h3>Coordinates</h3</h3>
+                <p>
+>                <strong>M<p><strong>MGRS:</strong> GRS:</strong> <button<button class="copy-btn" class="copy-btn" data-target="mgr data-target="mgrsOutput">📋</sOutput">📋</button> <span idbutton> <span id="mgrs="Output">ClickmgrsOutput">Click a button to a button to get coordinates</span></ get coordinates</span></p>
+                <p>p>
+                <p><strong>Lat/L<strong>Lat/Long:</strong>ong:</strong> <button class="copy-btn <button class="copy-btn" data-target="" data-target="latLonOutput">📋latLonOutput">📋</button> <span id</button> <span id="latLonOutput">Click="latLonOutput">Click a button to get coordinates</ a button to get coordinates</span></pspan></p>
+                <p><strong>Accuracy:</>
+                <p><strong>Accuracy:</strong> strong> <span<span id="accuracyOutput"> id="accuracyOutput">NN/A</span></p/A</span></p>
+            </div>
+            </>
+div>
+               </ </div>
+    </divdiv>
     </div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
-    <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
+>
+        <script src="https<script src="https://unpkg.com/leaflet://unpkg.com/leaflet@@1.91.9.4/dist/.4/dist/leaflet.js"></scriptleaflet.js"></script>
+>
+       <script  src="https://<script src="https://unpkg.com/projunpkg.com/proj4@2.4@2.99..00/dist/proj/dist/proj4.js"></script4.js"></script>
+    <script src="https://>
+    <script src="https://unpkg.com/projunpkg.com/proj4-mgrs@04-mgrs@0.1.2.1.2/dist/proj/dist/proj4-mgr4-mgrs.js"></s.js"></script>
+    <scriptscript>
     <script>
         // Signature: dimxxkun
-        document.addEventListener('DOMContentLoaded', () => {
-            const map = L.map('map').setView([9.0765, 7.3986], 6);
+        document.addEvent>
+        // Signature: dimxxkun
+        document.addEventListener('DOMContentLoaded('DOMContent', ()Loaded', () => {
+            const map = => {
+            const map = L.map('map L.map('map').setView').setView([9.076([9.0765, 75, 7.398.3986], 66], 6);
 
-            // Define basemaps
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
+            //);
+
+            // Define bas Define basemaps
+            const osmemaps
+            const osmLayer = L.tileLayer('Layer = L.tileLayer('https://{https://{s}.tile.openstreetmaps}.tile.openstreetmap.org/{.org/{z}/{xz}/{x}/{y}/{y}.png', {
+                attribution}.png', {
+                attribution: '&: '&copy; <a hrefcopy; <a href="https="https://www://www.openstreetmap.openstreetmap.org/c.orgopyright/copyright">Open">OpenStreetMap</a> contributorsStreetMap</a> contributors',
+                max',
+                maxZoom:Zoom: 19
             });
 
-            const esriSatellite = L.tileLayer(
-                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+ 19
+            });
+
+            const es            const esriSatellite = LriSatellite = L.tileLayer(
+                'https.tileLayer(
+                'https://server.arcgison://server.arclinegisonline.com/Arc.com/ArcGIS/rest/servicesGIS/rest/services/World_/World_ImageryImag/MapServer/tery/MapServer/tile/{z}/{yile/{z}/{y}/{x}/{x}',
                 {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-                    maxZoom: 19
+                    attribution}',
+                {
+                    attribution: 'Tiles: 'Tiles &copy; Es &copy; Esri &mdashri &;mdash; Source Source: Esri, i-c: Esri, i-cubed, USDAubed, USDA, USGS, USGS, AEX, Geo, AEX, GeoEye, GetEye, Getmapping,mapping, Aerogrid, IGN Aerogrid, IGN, I, IGP, UGP, UPR-EGP, andPR-EGP, and the GIS the GIS User Community',
+                    max User Community',
+                    maxZoom: 19Zoom: 19
+                }
+           
                 }
             );
 
-            osmLayer.addTo(map);
+            osmLayer.addTo           (map osmLayer.addTo(map);
+
+            const base);
 
             const baseMaps = {
-                "OpenStreetMap": osmLayer,
-                "Satellite Imagery": esriSatellite
+                "OpenMaps = {
+                "OpenStreetMap": osmStreetMap": osmLayer,
+                "SatelliteLayer,
+                "Satellite Imagery": es Imagery": esriSatellite
+           ri };
+
+           Satellite
             };
 
-            L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+            L.control.layers L.control.layers(baseMaps(baseMaps, null, null, { position: 'top, { position: 'topright' }).addTo(mapright' }).addTo(map);
 
-            // Define marker icons
+            // Define);
+
+            // Define marker icons marker icons
+            const gpsIcon = new L
             const gpsIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+                icon.Icon({
+               Url icon:Url: 'https://raw 'https://.githubusercontentraw.com.githubusercontent.com/pointhi/leaflet/pointhi/leaflet-color-markers-color-markers/master/master/img/img/marker-icon-/marker-icon-22xx-blue.png-blue.png',
+                shadowUrl: 'https://                shadowUrl: 'https://unpkg.com/leaflet@unpkg.com/leaflet@1.9.4/dist1.9.4/dist/images/marker-shadow/images/marker-shadow.png',
+                icon.png',
+Size                iconSize: [25,: [25, 41],
+                iconAnchor 41],
+                iconAnchor: [12: [12, 41, 41],
+                popup],
+                popupAnchor: [1Anchor:, - [1, -3434],
+               ],
+                shadow shadowSize: [41Size: [41, 41, 41]
             });
 
-            const enemyIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+            const enemy]
             });
 
-            let marker = null;
+            const enemyIcon = new L.IconIcon = new L.Icon({
+                iconUrl:({
+                ' iconUrl: 'https://raw.githubusercontent.com/po://raw.githubusercontent.com/pointhi/leaflet-colorinthi/leaflet-color-m-markers/masterarkers/master/img/img/m/marker-iconarker-icon-2x-red-2x-red.png',
+                shadow.png',
+                shadowUrl: 'https://Url: 'https://unpkg.com/leafletunpkg.com/leaflet@1.9@1.9.4/dist/images.4/m/distarker/images/marker-shadow.png',
+                icon-shadow.png',
+                iconSize: Size: [25,[25,  41],
+               41 iconAnchor],
+                iconAnchor: [12: [12, , 41],
+               41 popup],
+                popupAnchor: [1, -Anchor: [1, -3434],
+               ],
+ shadow                shadowSize: Size[41:, [41, 41]
+            });
+
+            41]
+            });
+
+            let marker = null let marker = null;
             let watchId = null;
-            let isTracking = false;
+            let watchId = null;
+            let isTracking =;
+ false            let isTracking = false;
 
-            const getLocationBtn = document.getElementById('getLocationBtn');
+            const get;
 
-            function updateButtonText() {
-                getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
+            const getLocationLocationBtn =Btn = document document.getElement.getByElementByIdId('get('getLocationBtn');
+
+            function updateLocationBtn');
+
+            function updateButtonText()ButtonText() {
+                get {
+                getLocationBtn.textContent =Location isBtn.textContent = isTracking ?Tracking ? ' 'StopStop Tracking Location' : 'Start Tracking Location' : 'Start Tracking Location';
+ Location';
             }
 
-            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
-                if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-                    document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
-                    document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
-                    document.getElementById('accuracyOutput').textContent = 'N/A';
-                    alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
+                       }
+
+ function updateCoordinates(lat            function updateCoordinates(lat, lon, accuracy =, lon, accuracy = null, isG null, isGps = false)ps = false) {
+                if (isNaN(lat {
+                if (isNaN(lat) || isNaN) || isNaN(lon(lon) |) || lat| lat < - < -9090 | || lat >| lat > 90 || lon < - 90 || lon < -180 || lon >180 || lon >  180) {
+                   180 document) {
+                    document.getElementById.get('mgrElementById('mgrsOutput').textsOutput').textContent =Content = 'Invalid coordinates '';
+                    documentInvalid coordinates';
+                    document.getElementById('lat.getElementById('latLonOutput').LonOutput').textContent =textContent = 'Invalid coordinates';
+                    document 'Invalid coordinates';
+                    document.getElementBy.getElementById('accuracyId('accuracyOutput').textContent = 'Output').textContent = 'N/A';
+                    alertN/A';
+                    alert('Latitude must be between -('Latitude must be between -90 and 90,90 and 90, Longitude between -180 and Longitude between -180 and 180.');
+                    return 180.');
                     return;
+                }
+
+                try;
                 }
 
                 try {
-                    const lonNum = parseFloat(lon);
-                    const latNum = parseFloat(lat);
+                    const lon {
+                    const lonNum = parseFloat(lNum = parseFloat(lon);
+                   on);
+                    const const latNum latNum = parseFloat(lat = parseFloat(lat);
 
-                    if (typeof proj4 === 'undefined' || typeof proj4.mgrs === 'undefined') {
-                        throw new Error('MGRS library failed to load');
+);
+
+                    if                    if (typeof proj4 === (typeof proj4 === ' 'undefined' |'| typeof proj || typeof proj4.mgrs === '4.mgrs === 'undefined') {
+                        throw newundefined') {
+                        throw new Error('MG Error('MGRS library failed to loadRS library failed to load');
                     }
 
-                    const mgrs = proj4.mgrs.forward([lonNum, latNum]);
-                    const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
-                    document.getElementById('mgrsOutput').textContent = mgrs;
-                    document.getElementById('latLonOutput').textContent = latLon;
-                    document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
+');
+                    }
+
+                    const mgr                    const mgrs = proj4.mgrs = proj4.mgrs.forward([lonNum, latNum]);
+                    const latLon = `s.forward([lonNum, latNum]);
+                    const latLon = `Lat: ${latNum.toLat: ${latNum.toFixed(6)}, LonFixed(6)}, Lon: ${lonNum.toFixed: ${lonNum.toFixed(6(6)}`;
+                    document)}`;
+                    document.getElementById('ElementmgrById('mgrsOutput').textContent =sOutput').textContent = mgrs mgrs;
+;
+                                       document.get document.getElementById('latLonElementById('latLonOutput').textContent = latOutput').textContent = latLon;
+                    document.getElementLon;
+                    document.getElementById('accuracyById('accuracyOutputOutput').text').textContent = accuracyContent = accuracy ? `±${ ? `±${accuracy.toaccuracy.toFixed(1)} metersFixed(1)} meters` : 'N/A` : 'N/A';
+
+                    if';
 
                     if (marker) {
-                        marker.setLatLng([latNum, lonNum]);
-                        marker.setIcon(isGps ? gpsIcon : enemyIcon);
+ (marker)                        marker {
+                        marker.setLatLng([lat.setLatLng([latNum, lonNumNum, lonNum]);
+]);
+                        marker                        marker.setIcon(is.setIcon(isGps ? gpsGps ? gpsIcon : enemyIcon : enemyIcon);
+                    } elseIcon);
                     } else {
-                        marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
+                        marker = L.marker( {
+                        marker = L.marker([latNum, lon[latNum, lonNum], { iconNum], { icon: isGps ?: isGps ? gps gpsIcon : enemyIcon : enemyIcon }).Icon }).addTo(map);
                     }
-                    map.setView([latNum, lonNum], map.getZoom());
-                    map.getContainer().classList.remove('picking-mode');
+addTo(map);
+                    }
+                                       map.setView( map.setView([latNum, lonNum], map[latNum, lonNum], map.getZoom.getZoom());
+());
+                                       map.get mapContainer.get().classContainer().classListList.remove('p.remove('picking-mode');
+                } catchicking-mode');
                 } catch (error) {
+                    console (error) {
                     console.error('MGRS conversion error:', error);
-                    document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
-                    document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-                    document.getElementById('accuracyOutput').textContent = 'N/A';
+                    document.error('MGRS conversion error:', error);
+                    document.getElementById('mgr.getElementById('mgrsOutput').textContent =sOutput').textContent = `MGRS conversion failed: `MGRS conversion failed: ${error.message}`;
+                    document ${error.message}`;
+                    document.getElementBy.getElementByIdId('lat('latLonOutput').textContent = `Lat:LonOutput').textContent = `Lat: ${lat.toFixed( ${lat.toFixed(66)},)}, Lon: ${ Lonlon: ${lon.toFixed(6.toFixed(6)}`;
+                    document.getElement)}`;
+                    document.getElementById('accuracyById('accuracyOutputOutput').textContent').text = 'Content = 'N/A';
+                }
+           N/A';
                 }
             }
 
-            getLocationBtn.addEventListener('click', () => {
+            get }
+
+            getLocationBtn.addEventListener('LocationBtn.addEventListener('click', () =>click', () => {
                 if (!navigator.geolocation) {
-                    alert('Geolocation is not supported by this browser.');
+                if (!navigator.geolocation) {
+ {
+                    alert('Geolocation                    alert('Geolocation is not supported is not supported by this browser.');
+                    return by this browser.');
                     return;
+;
+                               }
+
                 }
 
-                if (isTracking) {
-                    if (watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
+ if                if (isTracking) (isTracking) {
+                    if (watch {
+                    if (watchId !== null)Id !== null) {
+                        {
+                        navigator.geolocation.clearWatch navigator.geolocation.clearWatch(w(watchIdatchId);
+                        watchId);
+                        watch = nullId = null;
+                    }
+                    is;
                     }
                     isTracking = false;
-                    updateButtonText();
+                    updateTracking = false;
+                    updateButtonButtonText();
+                } elseText();
                 } else {
-                    watchId = navigator.geolocation.watchPosition(
-                        (position) => {
-                            const lat = position.coords.latitude;
+                    watch {
+                    watchId = navigator.geId = navigator.geolocation.watchPosition(
+olocation.watchPosition(
+                        (                        (position) => {
+                           position) => {
+                            const const lat = position lat = position.coords.coords.latitude;
+                            const lon = position.coords;
                             const lon = position.coords.longitude;
-                            const accuracy = position.coords.accuracy;
-                            console.log('Real-time position:', lat, lon, `Accuracy: ±${accuracy} meters`);
-                            updateCoordinates(lat, lon, accuracy, true);
+                            const accuracy.longitude;
+                            const accuracy = position.coords = position.coords.accuracy;
+                            console.accuracy;
+                            console.log('Real.log('Real-time position:',-time position:', lat lat, lon, lon, `Accuracy, `Accuracy: ±${accuracy}: ±${accuracy} meters`);
+                            update meters`);
+                            updateCoordinates(latCoordinates(lat, lon, accuracy,, lon, accuracy, true);
                         },
-                        (error) => {
-                            console.error('Geolocation error:', error);
-                            alert('Unable to retrieve location: ' + error.message);
-                            if (watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
+ true);
+                        },
+                        (error) =>                        (error) => {
+                            {
+                            console.error console('Ge.error('Geolocation errorolocation error:', error:', error);
+                            alert('Unable to retrieve);
+                            alert('Unable to retrieve location: ' + error.message location: ' + error.message);
+                            if);
+                            if (watch (watchId !== null)Id !== null) {
+                                {
+                                navigator navigator.geolocation.clearWatch.geolocation.clearWatch(watchId(watchId);
+                                watchId = null);
                                 watchId = null;
                             }
-                            isTracking = false;
-                            updateButtonText();
+                            is;
+                            }
+                            isTracking = falseTracking = false;
+                            update;
+                            updateButtonTextButton();
+Text                        },
+();
                         },
-                        {
-                            enableHighAccuracy: true,
-                            timeout: 10000,
-                            maximumAge: 0
+                                               {
+ {
+                            enableHighAccuracy                            enableHighAccuracy: true,
+: true,
+                                                       timeout: timeout: 10000,
+                            maximum 10000,
+                            maximumAge: 0Age: 0
+                        }
+                   
                         }
                     );
+                    isTracking = true );
                     isTracking = true;
                     updateButtonText();
                 }
-            });
-
-            document.getElementById('selectEnemyBtn').addEventListener('click', () => {
-                if (isTracking && watchId !== null) {
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                    isTracking = false;
+;
                     updateButtonText();
                 }
-
-                map.getContainer().classList.add('picking-mode');
-                map.once('click', (e) => {
-                    const lat = e.latlng.lat;
-                    const lon = e.latlng.lng;
-                    updateCoordinates(lat, lon, null, false);
-                });
-                alert('Click the map to select enemy coordinates.');
             });
 
-            const gpsControl = L.Control.extend({
-                options: { position: 'topleft' },
-                onAdd: function (map) {
-                    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-                    container.innerHTML = '📍';
-                    container.title = 'Zoom to your GPS location';
-                    container.style.backgroundColor = '#4b704b';
-                    container.style.width = '34px';
-                    container.style.height = '34px';
-                    container.style.display = 'flex';
-                    container.style.justifyContent = 'center';
-                    container.style.alignItems = 'center';
-                    container.style.cursor = 'pointer';
-                    container.style.fontSize = '18px';
-                    container.style.color = 'white';
+            document           .get });
 
-                    container.onclick = function () {
-                        if (navigator.geolocation) {
-                            navigator.geolocation.getCurrentPosition(
-                                (position) => {
-                                    const lat = position.coords.latitude;
+Element            document.getElementById('selectEnemyBtnById('selectEnemyBtn').addEventListener('click').addEventListener('click',', () => () => {
+                if {
+                if ( (isisTracking &&Tracking && watchId !== null) watchId !== null) {
+                    navigator.ge {
+                    navigator.geolocationolocation.clearWatch(watchId.clearWatch(watchId);
+                    watchId = null);
+                    watchId = null;
+                    is;
+Tracking =                    false isTracking = false;
+                    updateButtonText;
+                    updateButtonText();
+();
+                }
+
+                               }
+
+ map                map.get.getContainer().Container().classList.addclass('pickingList.add-mode('picking-mode');
+                map.once');
+                map.once('click', (('click', (ee) => {
+                    const) => {
+                    const lat lat = = e.latlng e.latlng.lat;
+                    const lon =.lat;
+                    const lon = e.l e.latlng.lngatlng.lng;
+                    updateCoordinates(lat;
+                    updateCoordinates(lat, lon,, null lon, null, false, false);
+                });
+                alert);
+                });
+                alert('Click('Click the the map to map to select enemy select enemy coordinates.');
+            });
+
+ coordinates.');
+            });
+
+            const gps            const gpsControl = L.Control.extendControl = L.Control.extend({
+                options: { position({
+                options: { position: 'topleft: 'topleft' },
+                onAdd:' },
+                onAdd: function (map) function (map) {
+                    const container = L.DomUtil {
+                    const container = L.DomUtil.create('div', '.create('div', 'leaflet-bar leaflet-controlleaflet-bar leaflet-control leaflet-control leaflet-control-custom');
+                    container-custom');
+                    container.innerHTML = '.innerHTML = '📍📍';
+                    container.title';
+                    container.title = 'Zoom to = 'Zoom to your GPS location your GPS location';
+                    container.style.backgroundColor =';
+                    container.style.backgroundColor = '#4b704b '#4b704b';
+                    container.style';
+                    container.width = '.style.width = '34px';
+                    container.style34px';
+                    container.style.height = '.height = '34px34px';
+                   ';
+                    container container.style.display =.style '.display = 'flex';
+flex                    container.style';
+                   .just container.style.justifyContent = 'centerifyContent = 'center';
+                    container.style.alignItems =';
+                    container.style.alignItems = 'center';
+                    'center container';
+                    container.style.style.cursor =.cursor = 'pointer 'pointer';
+                   ';
+ container.style.font                    container.styleSize =.fontSize = '18px';
+                    container '18px';
+                    container.style.color = '.style.color = 'white';
+
+                    containerwhite';
+
+                    container.onclick = function ().onclick = function () {
+ {
+                                               if (navigator.ge if (navigator.geolocationolocation) {
+                            navigator) {
+                            navigator.geolocation.get.geolocation.getCurrentPosition(
+                                (CurrentPosition(
+                                (position) =>) {
+                                    const => {
+                                    const lat = position.coords.latitude lat = position.coords.latitude;
+                                    const lon = position.coords;
                                     const lon = position.coords.longitude;
-                                    const accuracy = position.coords.accuracy;
-                                    map.setView([lat, lon], 15);
-                                    updateCoordinates(lat, lon, accuracy, true);
+                                    const accuracy.longitude;
+                                    const accuracy = position.coords = position.coords.accuracy;
+                                    map.accuracy;
+                                    map.setView(.setView([lat, lon[lat, lon], 15], 15);
+                                    updateCoordinates);
+                                    update(latCoordinates(lat, lon, accuracy, lon, accuracy, true, true);
                                 },
-                                (error) => {
-                                    alert('Unable to access GPS: ' + error.message);
+);
+                                },
+                                (error) =>                                (error) => {
+                                    alert(' {
+                                   Unable alert(' to accessUnable to access GPS: ' + error.message GPS: ' + error.message);
+                                },
+                               );
+                                },
+                                {
+                                    enableHighAccuracy: {
+                                    enableHighAccuracy: true,
+                                    timeout:  true,
+                                    timeout: 10000,
+                                    maximumAge10000,
+                                    maximumAge: 0
+                                }
+: 0
                                 }
                             );
+                        }                            );
                         } else {
-                            alert('Geolocation not supported.');
+ else {
+                            alert('Ge                            alert('Geolocationolocation not supported not.');
+ supported.');
                         }
-                    };
+                        }
+                                       };
+
+                    L.DomEvent.disable };
+
+                    L.DomEvent.disableClickPropagation(containerClickPropagation(container);
+
+                    return container);
 
                     return container;
                 }
+;
+                }
             });
 
-            map.addControl(new gpsControl());
+            map            });
+
+            map.add.addControl(newControl(new gpsControl gpsControl());
+            updateButtonText());
             updateButtonText();
 
-            function copyToClipboard(elementId) {
-                const text = document.getElementById(elementId).textContent;
-                navigator.clipboard.writeText(text).then(() => {
-                    alert('Copied to clipboard!');
-                }).catch(err => {
-                    alert('Failed to copy: ' + err);
-                });
+            function();
+
+ copyToClipboard(element            function copyToClipboard(elementId) {
+                constId) {
+                const text = document.getElementById(elementId).textContent text = document.getElementById(elementId).textContent;
+                const textarea;
+                const textarea = document.createElement('textarea = document.createElement('textarea');
+                textarea');
+                textarea.value = text;
+                textarea.value = text;
+                textarea.setAttribute.setAttribute('('readonly',readonly', '');
+                textarea.style '');
+                textarea.style.position.position = 'absolute';
+ =                textarea 'absolute';
+                textarea.style.left.style.left = = '-9999 '-9999px';
+px                document.body.append';
+                document.body.appendChild(textarea);
+                textareaChild(textarea);
+                textarea.select();
+                try.select();
+                try {
+                    document.exec {
+                    document.execCommand('copy');
+                    alertCommand('copy');
+                    alert('Copied('Copied to clipboard to clipboard!');
+                } catch (err)!');
+                } catch (err) {
+                    alert('Failed to {
+                    alert('Failed to copy: ' copy + err: ' + err);
+);
+                }
+                document.body.remove                }
+                document.body.removeChild(textareaChild(textarea);
             }
+
+           );
+ document.query            }
+
+            document.querySelectorAll('.SelectorAll('.copycopy-btn').forEach(btn-btn').forEach(btn => => {
+                btn {
+                btn.addEventListener('click',.addEventListener('click', () => {
+                    const () => {
+                    const target targetId = btn.datasetId = btn.dataset.target.target;
+;
+                    copy                    copyToClipboardToClipboard(targetId);
+                });
+           (targetId);
+                });
+            });
+        });
+ });
         });
     </script>
+</body    </script>
 </body>
+</html>
+>
 </html>
