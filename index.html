@@ -69,27 +69,6 @@
         #selectEnemyBtn:hover {
             background-color: #c00;
         }
-        .input-group {
-            margin: 10px 0;
-        }
-        label {
-            display: inline-block;
-            width: 100px;
-            color: #d4d4d4;
-        }
-        select, input {
-            padding: 5px;
-            background-color: #3c573c;
-            border: 1px solid #4b704b;
-            color: #ffffff;
-            margin-right: 10px;
-        }
-        select {
-            width: 200px;
-        }
-        input {
-            width: 150px;
-        }
         .output {
             margin-top: 20px;
         }
@@ -104,10 +83,6 @@
         .output span {
             font-weight: bold;
             color: #e6e6e6;
-        }
-        #inputFields {
-            display: flex;
-            flex-wrap: wrap;
         }
         .leaflet-control-layers {
             background-color: #2e4a2e;
@@ -136,26 +111,16 @@
                 <button id="getLocationBtn">Start Tracking Location</button>
                 <button id="selectEnemyBtn">Select Enemy Coordinates</button>
             </div>
-            <div class="input-group">
-                <label for="coordSystem">Coordinate System:</label>
-                <select id="coordSystem">
-                    <option value="dd">Decimal Degrees (DD)</option>
-                    <option value="ddm">Degrees and Decimal Minutes (DDM)</option>
-                    <option value="dms">Degrees, Minutes, Seconds (DMS)</option>
-                    <option value="utm">Universal Transverse Mercator (UTM)</option>
-                    <option value="usng">United States National Grid (USNG)</option>
-                    <option value="maidenhead">Maidenhead Locator System</option>
-                    <option value="pluscodes">Plus Codes (Open Location Code)</option>
-                </select>
-            </div>
-            <div class="input-group" id="inputFields">
-                <!-- Dynamic input fields will be injected here -->
-            </div>
-            <button id="convertInputBtn">Convert Input</button>
             <div class="output">
                 <h3>Coordinates</h3>
                 <p><strong>MGRS:</strong> <span id="mgrsOutput">Click a button to get coordinates</span></p>
-                <p><strong>Lat/Long:</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p><strong>Lat/Long (DD):</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p><strong>DDM:</strong> <span id="ddmOutput">Click a button to get coordinates</span></p>
+                <p><strong>DMS:</strong> <span id="dmsOutput">Click a button to get coordinates</span></p>
+                <p><strong>UTM:</strong> <span id="utmOutput">Click a button to get coordinates</span></p>
+                <p><strong>USNG:</strong> <span id="usngOutput">Click a button to get coordinates</span></p>
+                <p><strong>Maidenhead:</strong> <span id="maidenheadOutput">Click a button to get coordinates</span></p>
+                <p><strong>Plus Codes:</strong> <span id="pluscodesOutput">Click a button to get coordinates</span></p>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
             </div>
         </div>
@@ -216,171 +181,32 @@
             let isTracking = false;
             let wasTracking = false;
 
-            const coordSystemSelect = document.getElementById('coordSystem');
-            const inputFieldsDiv = document.getElementById('inputFields');
             const getLocationBtn = document.getElementById('getLocationBtn');
 
             function updateButtonText() {
                 getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
             }
 
-            function updateInputFields() {
-                const system = coordSystemSelect.value;
-                inputFieldsDiv.innerHTML = '';
-
-                if (system === 'dd') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="latInput">Latitude:</label>
-                        <input type="text" id="latInput" placeholder="e.g., 9.0765" />
-                        <label for="lonInput">Longitude:</label>
-                        <input type="text" id="lonInput" placeholder="e.g., 7.3986" />
-                    `;
-                } else if (system === 'ddm') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="latDeg">Lat Degrees:</label>
-                        <input type="text" id="latDeg" placeholder="e.g., 9" />
-                        <label for="latMin">Minutes:</label>
-                        <input type="text" id="latMin" placeholder="e.g., 4.59" />
-                        <label for="latDir">Direction:</label>
-                        <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-                        <label for="lonDeg">Lon Degrees:</label>
-                        <input type="text" id="lonDeg" placeholder="e.g., 7" />
-                        <label for="lonMin">Minutes:</label>
-                        <input type="text" id="lonMin" placeholder="e.g., 23.916" />
-                        <label for="lonDir">Direction:</label>
-                        <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
-                    `;
-                } else if (system === 'dms') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="latDeg">Lat Degrees:</label>
-                        <input type="text" id="latDeg" placeholder="e.g., 9" />
-                        <label for="latMin">Minutes:</label>
-                        <input type="text" id="latMin" placeholder="e.g., 4" />
-                        <label for="latSec">Seconds:</label>
-                        <input type="text" id="latSec" placeholder="e.g., 35.4" />
-                        <label for="latDir">Direction:</label>
-                        <select id="latDir"><option value="N">N</option><option value="S">S</option></select>
-                        <label for="lonDeg">Lon Degrees:</label>
-                        <input type="text" id="lonDeg" placeholder="e.g., 7" />
-                        <label for="lonMin">Minutes:</label>
-                        <input type="text" id="lonMin" placeholder="e.g., 23" />
-                        <label for="lonSec">Seconds:</label>
-                        <input type="text" id="lonSec" placeholder="e.g., 54.96" />
-                        <label for="lonDir">Direction:</label>
-                        <select id="lonDir"><option value="E">E</option><option value="W">W</option></select>
-                    `;
-                } else if (system === 'utm') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="zone">Zone:</label>
-                        <input type="text" id="zone" placeholder="e.g., 32" />
-                        <label for="easting">Easting:</label>
-                        <input type="text" id="easting" placeholder="e.g., 609517" />
-                        <label for="northing">Northing:</label>
-                        <input type="text" id="northing" placeholder="e.g., 1002972" />
-                        <label for="hemisphere">Hemisphere:</label>
-                        <select id="hemisphere"><option value="N">Northern</option><option value="S">Southern</option></select>
-                    `;
-                } else if (system === 'usng') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="usngInput">USNG:</label>
-                        <input type="text" id="usngInput" placeholder="e.g., 32NPA0950010297" style="width: 300px;" />
-                    `;
-                } else if (system === 'maidenhead') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="maidenheadInput">Maidenhead:</label>
-                        <input type="text" id="maidenheadInput" placeholder="e.g., JJ52QH" style="width: 300px;" />
-                    `;
-                } else if (system === 'pluscodes') {
-                    inputFieldsDiv.innerHTML = `
-                        <label for="plusCodeInput">Plus Code:</label>
-                        <input type="text" id="plusCodeInput" placeholder="e.g., 6GCRPR6C+2F" style="width: 300px;" />
-                    `;
-                }
-            }
-
-            coordSystemSelect.addEventListener('change', updateInputFields);
-            updateInputFields();
-
-            function parseCoordinateInput() {
-                const system = coordSystemSelect.value;
-                let lat, lon;
-
-                try {
-                    if (system === 'dd') {
-                        lat = parseFloat(document.getElementById('latInput').value);
-                        lon = parseFloat(document.getElementById('lonInput').value);
-                        if (isNaN(lat) || isNaN(lon)) throw new Error('Invalid DD coordinates');
-                    } else if (system === 'ddm') {
-                        const latDeg = parseFloat(document.getElementById('latDeg').value);
-                        const latMin = parseFloat(document.getElementById('latMin').value);
-                        const latDir = document.getElementById('latDir').value;
-                        const lonDeg = parseFloat(document.getElementById('lonDeg').value);
-                        const lonMin = parseFloat(document.getElementById('lonMin').value);
-                        const lonDir = document.getElementById('lonDir').value;
-                        if (isNaN(latDeg) || isNaN(latMin) || isNaN(lonDeg) || isNaN(lonMin)) {
-                            throw new Error('Invalid DDM coordinates');
-                        }
-                        lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latDir}`, 'dms');
-                        lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonDir}`, 'dms');
-                    } else if (system === 'dms') {
-                        const latDeg = parseFloat(document.getElementById('latDeg').value);
-                        const latMin = parseFloat(document.getElementById('latMin').value);
-                        const latSec = parseFloat(document.getElementById('latSec').value);
-                        const latDir = document.getElementById('latDir').value;
-                        const lonDeg = parseFloat(document.getElementById('lonDeg').value);
-                        const lonMin = parseFloat(document.getElementById('lonMin').value);
-                        const lonSec = parseFloat(document.getElementById('lonSec').value);
-                        const lonDir = document.getElementById('lonDir').value;
-                        if (isNaN(latDeg) || isNaN(latMin) || isNaN(latSec) || isNaN(lonDeg) || isNaN(lonMin) || isNaN(lonSec)) {
-                            throw new Error('Invalid DMS coordinates');
-                        }
-                        lat = Geodesy.Dms.toLat(`${latDeg} ${latMin} ${latSec} ${latDir}`, 'dms');
-                        lon = Geodesy.Dms.toLon(`${lonDeg} ${lonMin} ${lonSec} ${lonDir}`, 'dms');
-                    } else if (system === 'utm') {
-                        const zone = parseInt(document.getElementById('zone').value);
-                        const easting = parseFloat(document.getElementById('easting').value);
-                        const northing = parseFloat(document.getElementById('northing').value);
-                        const hemisphere = document.getElementById('hemisphere').value;
-                        if (isNaN(zone) || isNaN(easting) || isNaN(northing)) {
-                            throw new Error('Invalid UTM coordinates');
-                        }
-                        const utm = new Geodesy.Utm(zone, hemisphere, easting, northing);
-                        const latLon = utm.toLatLon();
-                        lat = latLon.lat;
-                        lon = latLon.lon;
-                    } else if (system === 'usng') {
-                        const usngStr = document.getElementById('usngInput').value.trim();
-                        const mgrs = Geodesy.Mgrs.parse(usngStr);
-                        const latLon = mgrs.toUtm().toLatLon();
-                        lat = latLon.lat;
-                        lon = latLon.lon;
-                    } else if (system === 'maidenhead') {
-                        const maidenhead = document.getElementById('maidenheadInput').value.trim().toUpperCase();
-                        if (!/^[A-R]{2}[0-9]{2}[A-X]{2}$/.test(maidenhead)) {
-                            throw new Error('Invalid Maidenhead locator');
-                        }
-                        const lon = (maidenhead.charCodeAt(0) - 65) * 20 - 180 + (parseInt(maidenhead[2]) * 2) + (maidenhead.charCodeAt(4) - 65) * 0.083333;
-                        const lat = (maidenhead.charCodeAt(1) - 65) * 10 - 90 + parseInt(maidenhead[3]) + (maidenhead.charCodeAt(5) - 65) * 0.041667;
-                        return { lat, lon };
-                    } else if (system === 'pluscodes') {
-                        const plusCode = document.getElementById('plusCodeInput').value.trim();
-                        if (!OpenLocationCode.isValid(plusCode)) {
-                            throw new Error('Invalid Plus Code');
-                        }
-                        const decoded = OpenLocationCode.decode(plusCode);
-                        lat = decoded.latitudeCenter;
-                        lon = decoded.longitudeCenter;
-                    }
-                    return { lat, lon };
-                } catch (error) {
-                    throw new Error(`Parsing error: ${error.message}`);
-                }
+            function toMaidenhead(lat, lon) {
+                const lonField = Math.floor((lon + 180) / 20);
+                const latField = Math.floor((lat + 90) / 10);
+                const lonSquare = Math.floor(((lon + 180) % 20) / 2);
+                const latSquare = Math.floor(((lat + 90) % 10));
+                const lonSubsquare = Math.floor((((lon + 180) % 2) / 0.083333));
+                const latSubsquare = Math.floor((((lat + 90) % 1) / 0.041667));
+                return `${String.fromCharCode(65 + lonField)}${String.fromCharCode(65 + latField)}${lonSquare}${latSquare}${String.fromCharCode(65 + lonSubsquare)}${String.fromCharCode(65 + latSubsquare)}`;
             }
 
             function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
                 if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
                     document.getElementById('mgrsOutput').textContent = 'Invalid coordinates';
                     document.getElementById('latLonOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('ddmOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('dmsOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('utmOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('usngOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('maidenheadOutput').textContent = 'Invalid coordinates';
+                    document.getElementById('pluscodesOutput').textContent = 'Invalid coordinates';
                     document.getElementById('accuracyOutput').textContent = 'N/A';
                     alert('Latitude must be between -90 and 90, Longitude between -180 and 180.');
                     return;
@@ -394,10 +220,42 @@
                         throw new Error('MGRS library failed to load');
                     }
 
+                    // MGRS
                     const mgrs = proj4.mgrs.forward([lonNum, latNum]);
-                    const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
                     document.getElementById('mgrsOutput').textContent = mgrs;
+
+                    // Decimal Degrees (DD)
+                    const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
                     document.getElementById('latLonOutput').textContent = latLon;
+
+                    // Degrees Decimal Minutes (DDM)
+                    const latDms = Geodesy.Dms.fromLat(latNum, 'dm', 3);
+                    const lonDms = Geodesy.Dms.fromLon(lonNum, 'dm', 3);
+                    document.getElementById('ddmOutput').textContent = `${latDms}, ${lonDms}`;
+
+                    // Degrees Minutes Seconds (DMS)
+                    const latDmsFull = Geodesy.Dms.fromLat(latNum, 'dms', 2);
+                    const lonDmsFull = Geodesy.Dms.fromLon(lonNum, 'dms', 2);
+                    document.getElementById('dmsOutput').textContent = `${latDmsFull}, ${lonDmsFull}`;
+
+                    // UTM
+                    const latLonPoint = new Geodesy.LatLonEllipsoidal(latNum, lonNum);
+                    const utm = latLonPoint.toUtm();
+                    document.getElementById('utmOutput').textContent = `${utm.zone}${utm.hemisphere} ${utm.easting.toFixed(0)} ${utm.northing.toFixed(0)}`;
+
+                    // USNG (approximated as MGRS for display)
+                    const mgrsObj = Geodesy.Mgrs.parse(mgrs);
+                    document.getElementById('usngOutput').textContent = mgrs;
+
+                    // Maidenhead
+                    const maidenhead = toMaidenhead(latNum, lonNum);
+                    document.getElementById('maidenheadOutput').textContent = maidenhead;
+
+                    // Plus Codes
+                    const plusCode = OpenLocationCode.encode(latNum, lonNum, OpenLocationCode.CODE_PRECISION_NORMAL);
+                    document.getElementById('pluscodesOutput').textContent = plusCode;
+
+                    // Accuracy
                     document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
 
                     if (marker) {
@@ -409,9 +267,15 @@
                     map.setView([latNum, lonNum], map.getZoom());
                     map.getContainer().classList.remove('picking-mode');
                 } catch (error) {
-                    console.error('MGRS conversion error:', error);
-                    document.getElementById('mgrsOutput').textContent = `MGRS conversion failed: ${error.message}`;
+                    console.error('Coordinate conversion error:', error);
+                    document.getElementById('mgrsOutput').textContent = `Conversion failed: ${error.message}`;
                     document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                    document.getElementById('ddmOutput').textContent = `Conversion failed`;
+                    document.getElementById('dmsOutput').textContent = `Conversion failed`;
+                    document.getElementById('utmOutput').textContent = `Conversion failed`;
+                    document.getElementById('usngOutput').textContent = `Conversion failed`;
+                    document.getElementById('maidenheadOutput').textContent = `Conversion failed`;
+                    document.getElementById('pluscodesOutput').textContent = `Conversion failed`;
                     document.getElementById('accuracyOutput').textContent = 'N/A';
                 }
             }
@@ -477,25 +341,6 @@
                     updateCoordinates(lat, lon, null, false);
                 });
                 alert('Click the map to select enemy coordinates.');
-            });
-
-            document.getElementById('convertInputBtn').addEventListener('click', () => {
-                if (isTracking && watchId !== null) {
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                    wasTracking = true;
-                    isTracking = false;
-                    updateButtonText();
-                } else {
-                    wasTracking = false;
-                }
-
-                try {
-                    const { lat, lon } = parseCoordinateInput();
-                    updateCoordinates(lat, lon, null, false);
-                } catch (error) {
-                    alert(error.message);
-                }
             });
 
             const gpsControl = L.Control.extend({
