@@ -93,6 +93,13 @@
         .leaflet-control-layers label {
             color: #d4d4d4;
         }
+        /* Ensure proper stacking of layers */
+        .leaflet-tile-pane {
+            z-index: 2;
+        }
+        .leaflet-overlay-pane {
+            z-index: 4;
+        }
     </style>
 </head>
 <body>
@@ -127,42 +134,52 @@
     <script>
         // Signature: dimxxkun
         document.addEventListener('DOMContentLoaded', () => {
-            const map = L.map('map').setView([9.0765, 7.3986], 6);
+            const map = L.map('map', {
+                minZoom: 2,
+                maxZoom: 19,
+                zoomControl: true
+            }).setView([9.0765, 7.3986], 6);
 
             // Basemaps
             const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors',
-                maxZoom: 19
+                maxZoom: 19,
+                errorTileUrl: '' // Disable pink tile placeholder
             });
             const esriSatellite = L.tileLayer(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 {
                     attribution: 'Tiles © Esri, USGS, USDA, and others',
-                    maxZoom: 19
+                    maxZoom: 19,
+                    errorTileUrl: '' // Disable pink tile placeholder
                 }
             );
             const esriTerrain = L.tileLayer(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
                 {
                     attribution: 'Tiles © Esri, USGS, NOAA, and others',
-                    maxZoom: 19
+                    maxZoom: 19,
+                    errorTileUrl: '' // Disable pink tile placeholder
                 }
             );
             const stamenHillshade = L.tileLayer(
                 'https://stamen-tiles-{s}.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png',
                 {
                     attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.',
-                    maxZoom: 19
+                    maxZoom: 19,
+                    opacity: 0.6, // Adjust opacity for better blending
+                    errorTileUrl: '' // Disable pink tile placeholder
                 }
-            );
+            ).addTo(map); // Add hillshade by default with terrain
             const esriLabels = L.tileLayer(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                 {
                     attribution: 'Labels © Esri',
-                    maxZoom: 19
+                    maxZoom: 19,
+                    errorTileUrl: '' // Disable pink tile placeholder
                 }
             );
-            osmLayer.addTo(map);
+            esriTerrain.addTo(map); // Set terrain as default basemap
 
             // Layer control with basemaps and overlays
             const baseMaps = {
