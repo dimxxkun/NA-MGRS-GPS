@@ -141,8 +141,24 @@
                     maxZoom: 19
                 }
             );
+            const esriLabels = L.tileLayer(
+                'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                {
+                    attribution: 'Labels © Esri',
+                    maxZoom: 19
+                }
+            );
             osmLayer.addTo(map);
-            L.control.layers({ "OpenStreetMap": osmLayer, "Satellite Imagery": esriSatellite }, null, { position: 'topright' }).addTo(map);
+
+            // Layer control with basemaps and overlay for labels
+            const baseMaps = {
+                "OpenStreetMap": osmLayer,
+                "Satellite Imagery": esriSatellite
+            };
+            const overlayMaps = {
+                "Place Labels": esriLabels
+            };
+            L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
 
             // Marker icons
             const gpsIcon = new L.Icon({
