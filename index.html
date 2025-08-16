@@ -93,6 +93,18 @@
         .leaflet-control-layers label {
             color: #d4d4d4;
         }
+        .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            color: #ffffff;
+            margin-left: 5px;
+            padding: 0;
+        }
+        .copy-btn:hover {
+            color: #5a8a5a;
+        }
     </style>
 </head>
 <body>
@@ -108,8 +120,8 @@
             </div>
             <div class="output">
                 <h3>Coordinates</h3>
-                <p><strong>MGRS:</strong> <span id="mgrsOutput">Click a button to get coordinates</span></p>
-                <p><strong>Lat/Long:</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
+                <p><strong>MGRS:</strong> <button class="copy-btn" onclick="copyToClipboard('mgrsOutput')">📋</button> <span id="mgrsOutput">Click a button to get coordinates</span></p>
+                <p><strong>Lat/Long:</strong> <button class="copy-btn" onclick="copyToClipboard('latLonOutput')">📋</button> <span id="latLonOutput">Click a button to get coordinates</span></p>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
             </div>
         </div>
@@ -167,7 +179,6 @@
             let marker = null;
             let watchId = null;
             let isTracking = false;
-            let wasTracking = false;
 
             const getLocationBtn = document.getElementById('getLocationBtn');
 
@@ -261,11 +272,8 @@
                 if (isTracking && watchId !== null) {
                     navigator.geolocation.clearWatch(watchId);
                     watchId = null;
-                    wasTracking = true;
                     isTracking = false;
                     updateButtonText();
-                } else {
-                    wasTracking = false;
                 }
 
                 map.getContainer().classList.add('picking-mode');
@@ -295,16 +303,6 @@
 
                     container.onclick = function () {
                         if (navigator.geolocation) {
-                            if (isTracking && watchId !== null) {
-                                navigator.geolocation.clearWatch(watchId);
-                                watchId = null;
-                                wasTracking = true;
-                                isTracking = false;
-                                updateButtonText();
-                            } else {
-                                wasTracking = false;
-                            }
-
                             navigator.geolocation.getCurrentPosition(
                                 (position) => {
                                     const lat = position.coords.latitude;
@@ -328,6 +326,15 @@
 
             map.addControl(new gpsControl());
             updateButtonText();
+
+            function copyToClipboard(elementId) {
+                const text = document.getElementById(elementId).textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Copied to clipboard!');
+                }).catch(err => {
+                    alert('Failed to copy: ' + err);
+                });
+            }
         });
     </script>
 </body>
