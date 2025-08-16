@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nigerian Army GPS Coordinate System</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.href='local/leaflet.css'" />
     <style>
         body {
             margin: 0;
@@ -84,6 +84,17 @@
             font-weight: bold;
             color: #e6e6e6;
         }
+        .error {
+            color: #ff4d4d;
+            font-weight: bold;
+        }
+        .loading::after {
+            content: ' ⏳';
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
         .leaflet-control-layers {
             background-color: #2e4a2e;
             color: #ffffff;
@@ -103,31 +114,31 @@
         <div id="map"></div>
         <div class="controls">
             <div class="button-group">
-                <button id="getLocationBtn">Start Tracking Location</button>
-                <button id="selectEnemyBtn">Select Enemy Coordinates</button>
+                <button id="getLocationBtn" aria-label="Toggle GPS location tracking">Start Tracking Location</button>
+                <button id="selectEnemyBtn" aria-label="Select enemy coordinates on map">Select Enemy Coordinates</button>
             </div>
             <div class="output">
                 <h3>Coordinates</h3>
-                <p>
-                    <strong>MGRS:</strong>
-                    <span id="mgrsOutput">Click a button to get coordinates</span>
-                </p>
-                <p>
-                    <strong>Lat/Long:</strong>
-                    <span id="latLonOutput">Click a button to get coordinates</span>
-                </p>
+                <p><strong>MGRS:</strong> <span id="mgrsOutput">Click a button to get coordinates</span></p>
+                <p><strong>Lat/Long:</strong> <span id="latLonOutput">Click a button to get coordinates</span></p>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
+                <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
+                <p class="error" id="errorOutput" aria-live="polite"></p>
             </div>
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
-    <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onerror="this.src='local/leaflet.js'"></script>
+    <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js" onerror="this.src='local/proj4.js'"></script>
+    <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js" onerror="this.src='local/proj4-mgrs.js'"></script>
     <script>
         // Internal reference: ZGltbHh4a3Vu (encoded metadata)
         document.addEventListener('DOMContentLoaded', () => {
-            const map = L.map('map').setView([9.0765, 7.3986], 6);
+            // Initialize map with saved view or default (Abuja, Nigeria)
+            const savedView = localStorage.getItem('lastMapView');
+            const defaultView = { lat: 9.0765, lng: 7.3986, zoom: 6 };
+            const initialView = savedView ? JSON.parse(savedView) : defaultView;
+            const map = L.map('map').setView([initialView.lat, initialView.lng], initialView.zoom);
 
             // Basemaps
             const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -157,7 +168,7 @@
             );
             osmLayer.addTo(map);
 
-            // Layer control with basemaps and overlay for labels
+            // Layer control
             const baseMaps = {
                 "OpenStreetMap": osmLayer,
                 "Satellite Imagery": esriSatellite,
@@ -175,6 +186,16 @@
                 imperial: true
             }).addTo(map);
 
+            // Save map view on move
+            map.on('moveend', () => {
+                const center = map.getCenter();
+                localStorage.setItem('lastMapView', JSON.stringify({
+                    lat: center.lat,
+                    lng: center.lng,
+                    zoom: map.getZoom()
+                }));
+            });
+
             // Marker icons
             const gpsIcon = new L.Icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
@@ -187,22 +208,35 @@
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
             });
 
-            let marker = null, watchId = null, isTracking = false;
+            let marker = null, watchId = null, isTracking = false, isPaused = false;
             const getLocationBtn = document.getElementById('getLocationBtn');
+            const errorOutput = document.getElementById('errorOutput');
 
             function updateButtonText() {
-                getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
+                getLocationBtn.textContent = isTracking ? (isPaused ? 'Resume Tracking' : 'Pause Tracking') : 'Start Tracking Location';
+            }
+
+            function setError(message) {
+                errorOutput.textContent = message;
+                setTimeout(() => errorOutput.textContent = '', 5000); // Clear after 5s
+            }
+
+            function setLoading(isLoading) {
+                getLocationBtn.classList.toggle('loading', isLoading);
             }
 
             function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
                 try {
                     const lonNum = parseFloat(lon);
                     const latNum = parseFloat(lat);
+                    if (isNaN(lonNum) || isNaN(latNum)) throw new Error('Invalid coordinates');
                     const mgrs = proj4.mgrs.forward([lonNum, latNum]);
                     const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
                     document.getElementById('mgrsOutput').textContent = mgrs;
                     document.getElementById('latLonOutput').textContent = latLon;
                     document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
+                    document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+                    errorOutput.textContent = '';
 
                     if (marker) {
                         marker.setLatLng([latNum, lonNum]).setIcon(isGps ? gpsIcon : enemyIcon);
@@ -212,38 +246,78 @@
                     map.setView([latNum, lonNum], map.getZoom());
                     map.getContainer().classList.remove('picking-mode');
                 } catch (error) {
-                    console.error('MGRS conversion error:', error);
+                    setError('Error: Unable to process coordinates');
+                    console.error('Coordinate error:', error);
+                } finally {
+                    setLoading(false);
                 }
             }
 
             // Tracking button
             getLocationBtn.addEventListener('click', () => {
                 if (!navigator.geolocation) {
-                    alert('Geolocation not supported.');
+                    setError('Geolocation not supported. Enter coordinates manually?');
+                    const coords = prompt('Enter Lat, Lon (e.g., 9.0765, 7.3986):');
+                    if (coords) {
+                        const [lat, lon] = coords.split(',').map(s => s.trim());
+                        updateCoordinates(lat, lon, null, false);
+                    }
                     return;
                 }
                 if (isTracking) {
-                    if (watchId) navigator.geolocation.clearWatch(watchId);
-                    watchId = null; isTracking = false; updateButtonText();
+                    if (isPaused) {
+                        setLoading(true);
+                        watchId = navigator.geolocation.watchPosition(
+                            pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+                            err => {
+                                setError('Location error: ' + err.message);
+                                isTracking = false;
+                                isPaused = false;
+                                updateButtonText();
+                                setLoading(false);
+                            },
+                            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        );
+                        isPaused = false;
+                    } else {
+                        navigator.geolocation.clearWatch(watchId);
+                        isPaused = true;
+                    }
                 } else {
+                    setLoading(true);
                     watchId = navigator.geolocation.watchPosition(
                         pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
-                        err => { alert('Location error: ' + err.message); isTracking = false; updateButtonText(); },
+                        err => {
+                            setError('Location error: ' + err.message);
+                            isTracking = false;
+                            isPaused = false;
+                            updateButtonText();
+                            setLoading(false);
+                        },
                         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
-                    isTracking = true; updateButtonText();
+                    isTracking = true;
+                    isPaused = false;
                 }
+                updateButtonText();
             });
 
             // Enemy coordinates selection
             document.getElementById('selectEnemyBtn').addEventListener('click', () => {
                 if (isTracking && watchId) {
                     navigator.geolocation.clearWatch(watchId);
-                    watchId = null; isTracking = false; updateButtonText();
+                    watchId = null;
+                    isTracking = false;
+                    isPaused = false;
+                    updateButtonText();
                 }
                 map.getContainer().classList.add('picking-mode');
-                map.once('click', e => updateCoordinates(e.latlng.lat, e.latlng.lng, null, false));
-                alert('Click the map to select enemy coordinates.');
+                setError('Click the map to select enemy coordinates');
+                let clickTimeout = null;
+                map.once('click', e => {
+                    clearTimeout(clickTimeout);
+                    clickTimeout = setTimeout(() => updateCoordinates(e.latlng.lat, e.latlng.lng, null, false), 200);
+                });
             });
 
             // GPS zoom control
@@ -253,6 +327,7 @@
                     const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
                     container.innerHTML = '📍';
                     container.title = 'Zoom to your GPS location';
+                    container.setAttribute('aria-label', 'Zoom to current GPS location');
                     Object.assign(container.style, {
                         backgroundColor: '#4b704b', width: '34px', height: '34px',
                         display: 'flex', justifyContent: 'center', alignItems: 'center',
@@ -260,10 +335,16 @@
                     });
                     container.onclick = () => {
                         if (navigator.geolocation) {
+                            setLoading(true);
                             navigator.geolocation.getCurrentPosition(
-                                pos => { map.setView([pos.coords.latitude, pos.coords.longitude], 15); updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true); },
-                                err => alert('Unable to access GPS: ' + err.message)
+                                pos => {
+                                    map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                                    updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true);
+                                },
+                                err => setError('Unable to access GPS: ' + err.message)
                             );
+                        } else {
+                            setError('Geolocation not supported');
                         }
                     };
                     return container;
@@ -271,6 +352,8 @@
             });
             map.addControl(new gpsControl());
             updateButtonText();
+
+            // Note: For full offline support, implement a service worker for tile caching (e.g., using Leaflet.Offline).
         });
     </script>
 </body>
