@@ -83,17 +83,11 @@
         .coord-line {
             display: flex;
             align-items: center;
-            justify-content: space-space-between;
+            justify-content: space-between;
             margin: 6px 0;
-        }
-        .coord-line strong {
-            width: 150px; /* Align labels */
         }
         .coord-line span {
             font-weight: bold;
-            color: #e6e6e6;
-        }
-        #distanceOutput, #bearingOutput {
             color: #e6e6e6;
         }
         .copy-btn {
@@ -163,13 +157,6 @@
                 </div>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
                 <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
-                <div class="coord-line">
-                    <strong>Distance to Enemy:</strong> <span id="distanceOutput">N/A</span>
-                </div>
-                <div class="coord-line">
-                    <strong>Bearing to Enemy:</strong> <span id="bearingOutput">N/A</span>
-                    <button class="copy-btn" data-target="bearingOutput" aria-label="Copy Bearing">📋 Copy</button>
-                </div>
                 <p class="status" id="statusOutput" aria-live="polite"></p>
                 <p class="error" id="errorOutput" aria-live="polite"></p>
             </div>
@@ -241,9 +228,7 @@
             });
             const enemyIcon = new L.Icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4
-
-/dist/images/marker-shadow.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
                 iconSize: [25,41], iconAnchor: [12,41],
                 iconUrlFallback: 'assets/marker-icon-2x-red.png',
                 shadowUrlFallback: 'assets/marker-shadow.png'
@@ -273,31 +258,14 @@
             let watchId = null, isTracking = false, isPaused = false, isFirstFix = true;
 
             // Helpers
-            function calculateDistanceAndBearing(lat1, lon1, lat2, lon2) {
-                const R = 6371000; // Earth's radius in meters
-                const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-                const Δφ = (lat2 - lat1) * Math.PI / 180;
-                const Δλ = (lon2 - lon1) * Math.PI / 180;
-                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                          Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-                const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                const y = Math.sin(Δλ) * Math.cos(φ2);
-                const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-                let bearing = Math.atan2(y, x) * 180 / Math.PI;
-                bearing = (bearing + 360) % 360;
-                return { distance: distance.toFixed(2), bearing: bearing.toFixed(2) };
-            }
-
             function updateButtonText() {
                 getLocationBtn.textContent = isTracking ? (isPaused ? 'Resume Tracking' : 'Pause Tracking') : 'Start Tracking Location';
                 statusOutput.textContent = isTracking ? (isPaused ? 'Tracking Paused' : 'Tracking Active') : '';
             }
-
             function setError(msg, duration = 6000) {
                 errorOutput.textContent = msg;
                 setTimeout(() => { if (errorOutput.textContent === msg) errorOutput.textContent = ''; }, duration);
             }
-
             function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
                 let mgrs;
                 try {
@@ -315,38 +283,21 @@
                     if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
                     else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
                     if (isFirstFix) {
-                        map.flyTo([lat, lon], 15, { animate: true, duration: 1 });
+                        map.flyTo([lat, lon], 15, { animate: true, duration: 1 }); // Smooth zoom on first fix
                         isFirstFix = false;
                     } else {
-                        map.flyTo([lat, lon], map.getZoom(), { animate: true, duration: 1 });
+                        map.flyTo([lat, lon], map.getZoom(), { animate: true, duration: 1 }); // Smooth pan
                     }
                 } else {
-                    const marker = L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
-                    marker.on('click', () => {
-                        if (!gpsMarker) {
-                            setError('No GPS position available. Start tracking to calculate distance and bearing.');
-                            document.getElementById('distanceOutput').textContent = 'N/A';
-                            document.getElementById('bearingOutput').textContent = 'N/A';
-                            return;
-                        }
-                        const gpsPos = gpsMarker.getLatLng();
-                        const enemyPos = marker.getLatLng();
-                        const { distance, bearing } = calculateDistanceAndBearing(
-                            gpsPos.lat, gpsPos.lng, enemyPos.lat, enemyPos.lng
-                        );
-                        document.getElementById('distanceOutput').textContent = `${distance} m`;
-                        document.getElementById('bearingOutput').textContent = `${bearing}°`;
-                        setError(`Calculated: ${distance} m, ${bearing}°`);
-                    });
+                    L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
                 }
             }
-
             function startTracking() {
                 if (!window.isSecureContext) {
                     setError('Geolocation requires a secure context (HTTPS). Please use a secure connection.');
                     return;
                 }
-                isFirstFix = true;
+                isFirstFix = true; // Reset first fix flag
                 watchId = navigator.geolocation.watchPosition(
                     pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
                     err => {
@@ -359,13 +310,12 @@
                 isPaused = false;
                 updateButtonText();
             }
-
             function stopTracking() {
                 if (watchId) navigator.geolocation.clearWatch(watchId);
                 watchId = null;
                 isTracking = false;
                 isPaused = false;
-                isFirstFix = true;
+                isFirstFix = true; // Reset for next tracking session
                 updateButtonText();
             }
 
@@ -387,6 +337,7 @@
                 }
             });
 
+            // Keyboard support for buttons
             getLocationBtn.addEventListener('keydown', e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -423,8 +374,6 @@
                 document.getElementById('latLonOutput').textContent = 'N/A';
                 document.getElementById('accuracyOutput').textContent = 'N/A';
                 document.getElementById('timestampOutput').textContent = 'N/A';
-                document.getElementById('distanceOutput').textContent = 'N/A';
-                document.getElementById('bearingOutput').textContent = 'N/A';
                 setError('Enemy markers cleared');
             });
 
@@ -439,10 +388,6 @@
             document.querySelectorAll('.copy-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const target = document.getElementById(btn.dataset.target);
-                    if (target.textContent === 'N/A') {
-                        setError('No data to copy.');
-                        return;
-                    }
                     navigator.clipboard.writeText(target.textContent).then(() => {
                         setError('Copied!');
                         btn.classList.add('copied');
