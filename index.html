@@ -114,7 +114,6 @@
         .leaflet-control-layers label {
             color: #d4d4d4;
         }
-        /* Scale bar styling */
         .leaflet-control-scale {
             background-color: #2e4a2e;
             color: #d4d4d4;
@@ -128,7 +127,6 @@
             color: #d4d4d4;
             border-color: #4b704b;
         }
-        /* Responsive adjustments */
         @media (max-width: 600px) {
             #map { height: 50vh; }
             button { padding: 8px 14px; font-size: 0.9em; }
@@ -257,7 +255,7 @@
             const clearEnemyBtn = document.getElementById('clearEnemyBtn');
             const errorOutput = document.getElementById('errorOutput');
             const statusOutput = document.getElementById('statusOutput');
-            let watchId = null, isTracking = false, isPaused = false;
+            let watchId = null, isTracking = false, isPaused = false, isFirstFix = true;
 
             // Helpers
             function updateButtonText() {
@@ -284,7 +282,12 @@
                 if (isGps) {
                     if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
                     else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
-                    map.panTo([lat, lon]);
+                    if (isFirstFix) {
+                        map.setView([lat, lon], 15); // Zoom to level 15 on first GPS fix
+                        isFirstFix = false;
+                    } else {
+                        map.panTo([lat, lon]); // Pan for subsequent updates
+                    }
                 } else {
                     L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
                 }
@@ -294,6 +297,7 @@
                     setError('Geolocation requires a secure context (HTTPS). Please use a secure connection.');
                     return;
                 }
+                isFirstFix = true; // Reset first fix flag
                 watchId = navigator.geolocation.watchPosition(
                     pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
                     err => {
@@ -311,6 +315,7 @@
                 watchId = null;
                 isTracking = false;
                 isPaused = false;
+                isFirstFix = true; // Reset for next tracking session
                 updateButtonText();
             }
 
