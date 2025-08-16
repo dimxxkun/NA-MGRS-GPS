@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nigerian Army GPS Coordinate System</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.112/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <style>
         body {
             margin: 0;
             font-family: 'Arial', sans-serif;
             background-color: #1a2b1a;
             color: #ffffff;
+            overflow: hidden;
         }
         .container {
             max-width: 1200px;
@@ -29,13 +30,10 @@
             color: #d4d4d4;
             text-transform: uppercase;
         }
-        #map {
+        #cesiumContainer {
             height: 500px;
             border: 2px solid #4b704b;
             margin: 20px 0;
-        }
-        #map.picking-mode {
-            cursor: crosshair;
         }
         .controls {
             background-color: #2e4a2e;
@@ -84,22 +82,6 @@
             font-weight: bold;
             color: #e6e6e6;
         }
-        .leaflet-control-layers {
-            background-color: #2e4a2e;
-            color: #ffffff;
-            border: 2px solid #4b704b;
-            border-radius: 5px;
-        }
-        .leaflet-control-layers label {
-            color: #d4d4d4;
-        }
-        /* Ensure proper stacking of layers */
-        .leaflet-tile-pane {
-            z-index: 2;
-        }
-        .leaflet-overlay-pane {
-            z-index: 4;
-        }
     </style>
 </head>
 <body>
@@ -107,7 +89,7 @@
         <header>
             <h1>Nigerian Army Coordinate System</h1>
         </header>
-        <div id="map"></div>
+        <div id="cesiumContainer"></div>
         <div class="controls">
             <div class="button-group">
                 <button id="getLocationBtn">Start Tracking Location</button>
@@ -128,120 +110,92 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.112/Build/Cesium/Cesium.js"></script>
     <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
     <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
     <script>
         // Signature: dimxxkun
         document.addEventListener('DOMContentLoaded', () => {
-            const map = L.map('map', {
-                minZoom: 2,
-                maxZoom: 19,
-                zoomControl: true
-            }).setView([9.0765, 7.3986], 6);
-
-            // Basemaps
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors',
-                maxZoom: 19,
-                errorTileUrl: '' // Disable pink tile placeholder
-            });
-            const esriSatellite = L.tileLayer(
-                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                {
-                    attribution: 'Tiles © Esri, USGS, USDA, and others',
-                    maxZoom: 19,
-                    errorTileUrl: '' // Disable pink tile placeholder
-                }
-            );
-            const esriTerrain = L.tileLayer(
-                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-                {
-                    attribution: 'Tiles © Esri, USGS, NOAA, and others',
-                    maxZoom: 19,
-                    errorTileUrl: '' // Disable pink tile placeholder
-                }
-            );
-            const stamenHillshade = L.tileLayer(
-                'https://stamen-tiles-{s}.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png',
-                {
-                    attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.',
-                    maxZoom: 19,
-                    opacity: 0.6, // Adjust opacity for better blending
-                    errorTileUrl: '' // Disable pink tile placeholder
-                }
-            ).addTo(map); // Add hillshade by default with terrain
-            const esriLabels = L.tileLayer(
-                'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-                {
-                    attribution: 'Labels © Esri',
-                    maxZoom: 19,
-                    errorTileUrl: '' // Disable pink tile placeholder
-                }
-            );
-            esriTerrain.addTo(map); // Set terrain as default basemap
-
-            // Layer control with basemaps and overlays
-            const baseMaps = {
-                "OpenStreetMap": osmLayer,
-                "Satellite Imagery": esriSatellite,
-                "Terrain Map": esriTerrain
-            };
-            const overlayMaps = {
-                "Place Labels": esriLabels,
-                "Hillshade (3D Effect)": stamenHillshade
-            };
-            L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
-
-            // Add scale bar
-            L.control.scale({
-                position: 'bottomleft',
-                metric: true,
-                imperial: true
-            }).addTo(map);
-
-            // Marker icons
-            const gpsIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-            });
-            const enemyIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+            // Initialize Cesium Viewer
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                terrainProvider: Cesium.createWorldTerrain({
+                    requestWaterMask: true,
+                    requestVertexNormals: true
+                }),
+                imageryProvider: new Cesium.TileMapServiceImageryProvider({
+                    url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
+                }),
+                baseLayer: Cesium.ImageryLayer.fromWorldImagery(),
+                sceneMode: Cesium.SceneMode.SCENE3D,
+                selectionIndicator: false,
+                infoBox: false,
+                navigationHelpButton: false,
+                animation: false,
+                timeline: false,
+                fullscreenButton: false,
+                homeButton: false,
+                geocoder: false
             });
 
-            let marker = null, watchId = null, isTracking = false;
-            const getLocationBtn = document.getElementById('getLocationBtn');
+            // Set initial view to Nigeria
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(7.3986, 9.0765, 1000000), // Centered on Nigeria, 1M altitude
+                orientation: {
+                    heading: Cesium.Math.toRadians(0.0),
+                    pitch: Cesium.Math.toRadians(-30.0),
+                    roll: 0.0
+                }
+            });
 
-            function updateButtonText() {
-                getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
-            }
+            // Marker entities
+            let gpsMarker = null;
+            let enemyMarker = null;
 
-            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
+            function updateCoordinates(latitude, longitude, accuracy = null, isGps = false) {
                 try {
-                    const lonNum = parseFloat(lon);
-                    const latNum = parseFloat(lat);
-                    const mgrs = proj4.mgrs.forward([lonNum, latNum]);
-                    const latLon = `Lat: ${latNum.toFixed(6)}, Lon: ${lonNum.toFixed(6)}`;
+                    const mgrs = proj4.mgrs.forward([longitude, latitude]);
+                    const latLon = `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`;
                     document.getElementById('mgrsOutput').textContent = mgrs;
                     document.getElementById('latLonOutput').textContent = latLon;
                     document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)} meters` : 'N/A';
 
-                    if (marker) {
-                        marker.setLatLng([latNum, lonNum]).setIcon(isGps ? gpsIcon : enemyIcon);
+                    const position = Cesium.Cartesian3.fromDegrees(longitude, latitude);
+                    if (isGps) {
+                        if (gpsMarker) viewer.entities.remove(gpsMarker);
+                        gpsMarker = viewer.entities.add({
+                            position: position,
+                            billboard: {
+                                image: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                                width: 25,
+                                height: 41
+                            }
+                        });
                     } else {
-                        marker = L.marker([latNum, lonNum], { icon: isGps ? gpsIcon : enemyIcon }).addTo(map);
+                        if (enemyMarker) viewer.entities.remove(enemyMarker);
+                        enemyMarker = viewer.entities.add({
+                            position: position,
+                            billboard: {
+                                image: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                                width: 25,
+                                height: 41
+                            }
+                        });
                     }
-                    map.setView([latNum, lonNum], map.getZoom());
-                    map.getContainer().classList.remove('picking-mode');
+                    viewer.camera.flyTo({ destination: position, orientation: { pitch: Cesium.Math.toRadians(-30.0) } });
                 } catch (error) {
                     console.error('MGRS conversion error:', error);
                 }
             }
 
             // Tracking button
+            const getLocationBtn = document.getElementById('getLocationBtn');
+            let watchId = null;
+            let isTracking = false;
+
+            function updateButtonText() {
+                getLocationBtn.textContent = isTracking ? 'Stop Tracking Location' : 'Start Tracking Location';
+            }
+
             getLocationBtn.addEventListener('click', () => {
                 if (!navigator.geolocation) {
                     alert('Geolocation not supported.');
@@ -249,14 +203,17 @@
                 }
                 if (isTracking) {
                     if (watchId) navigator.geolocation.clearWatch(watchId);
-                    watchId = null; isTracking = false; updateButtonText();
+                    watchId = null;
+                    isTracking = false;
+                    updateButtonText();
                 } else {
                     watchId = navigator.geolocation.watchPosition(
                         pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
                         err => { alert('Location error: ' + err.message); isTracking = false; updateButtonText(); },
                         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
-                    isTracking = true; updateButtonText();
+                    isTracking = true;
+                    updateButtonText();
                 }
             });
 
@@ -264,38 +221,54 @@
             document.getElementById('selectEnemyBtn').addEventListener('click', () => {
                 if (isTracking && watchId) {
                     navigator.geolocation.clearWatch(watchId);
-                    watchId = null; isTracking = false; updateButtonText();
+                    watchId = null;
+                    isTracking = false;
+                    updateButtonText();
                 }
-                map.getContainer().classList.add('picking-mode');
-                map.once('click', e => updateCoordinates(e.latlng.lat, e.latlng.lng, null, false));
+                viewer.screenSpaceEventHandler.setInputAction(function (click) {
+                    const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+                    if (cartesian) {
+                        const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+                        const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+                        const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+                        updateCoordinates(latitude, longitude, null, false);
+                        viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+                    }
+                }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
                 alert('Click the map to select enemy coordinates.');
             });
 
             // GPS zoom control
-            const gpsControl = L.Control.extend({
-                options: { position: 'topleft' },
-                onAdd: () => {
-                    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-                    container.innerHTML = '📍';
-                    container.title = 'Zoom to your GPS location';
-                    Object.assign(container.style, {
-                        backgroundColor: '#4b704b', width: '34px', height: '34px',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center',
-                        cursor: 'pointer', fontSize: '18px', color: 'white'
-                    });
-                    container.onclick = () => {
-                        if (navigator.geolocation) {
-                            navigator.geolocation.getCurrentPosition(
-                                pos => { map.setView([pos.coords.latitude, pos.coords.longitude], 15); updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true); },
-                                err => alert('Unable to access GPS: ' + err.message)
-                            );
-                        }
-                    };
-                    return container;
-                }
+            const gpsControl = document.createElement('div');
+            gpsControl.innerHTML = '📍';
+            gpsControl.title = 'Zoom to your GPS location';
+            Object.assign(gpsControl.style, {
+                backgroundColor: '#4b704b',
+                width: '34px',
+                height: '34px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                cursor: 'pointer',
+                fontSize: '18px',
+                color: 'white',
+                position: 'absolute',
+                top: '20px',
+                left: '20px'
             });
-            map.addControl(new gpsControl());
-            updateButtonText();
+            gpsControl.onclick = () => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        pos => {
+                            const position = Cesium.Cartesian3.fromDegrees(pos.coords.longitude, pos.coords.latitude, 50000); // 50km altitude
+                            viewer.camera.flyTo({ destination: position, orientation: { pitch: Cesium.Math.toRadians(-30.0) } });
+                            updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true);
+                        },
+                        err => alert('Unable to access GPS: ' + err.message)
+                    );
+                }
+            };
+            document.getElementById('cesiumContainer').appendChild(gpsControl);
         });
     </script>
 </body>
