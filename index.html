@@ -148,6 +148,13 @@
                     maxZoom: 19
                 }
             );
+            const stamenHillshade = L.tileLayer(
+                'https://stamen-tiles-{s}.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png',
+                {
+                    attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.',
+                    maxZoom: 19
+                }
+            );
             const esriLabels = L.tileLayer(
                 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                 {
@@ -157,14 +164,15 @@
             );
             osmLayer.addTo(map);
 
-            // Layer control with basemaps and overlay for labels
+            // Layer control with basemaps and overlays
             const baseMaps = {
                 "OpenStreetMap": osmLayer,
                 "Satellite Imagery": esriSatellite,
                 "Terrain Map": esriTerrain
             };
             const overlayMaps = {
-                "Place Labels": esriLabels
+                "Place Labels": esriLabels,
+                "Hillshade (3D Effect)": stamenHillshade
             };
             L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
 
