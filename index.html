@@ -283,10 +283,10 @@
                     if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
                     else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
                     if (isFirstFix) {
-                        map.flyTo([lat, lon], 15, { animate: true, duration: 1 }); // Smooth zoom on first fix
+                        map.setView([lat, lon], 15); // Zoom to level 15 on first GPS fix
                         isFirstFix = false;
                     } else {
-                        map.flyTo([lat, lon], map.getZoom(), { animate: true, duration: 1 }); // Smooth pan
+                        map.panTo([lat, lon]); // Pan for subsequent updates
                     }
                 } else {
                     L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
