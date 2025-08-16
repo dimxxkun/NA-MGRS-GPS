@@ -93,18 +93,6 @@
         .leaflet-control-layers label {
             color: #d4d4d4;
         }
-        .copy-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1em;
-            color: #ffffff;
-            margin-left: 5px;
-            padding: 0;
-        }
-        .copy-btn:hover {
-            color: #5a8a5a;
-        }
     </style>
 </head>
 <body>
@@ -122,12 +110,10 @@
                 <h3>Coordinates</h3>
                 <p>
                     <strong>MGRS:</strong>
-                    <button id="copyMgrsBtn" class="copy-btn">📋</button>
                     <span id="mgrsOutput">Click a button to get coordinates</span>
                 </p>
                 <p>
                     <strong>Lat/Long:</strong>
-                    <button id="copyLatLonBtn" class="copy-btn">📋</button>
                     <span id="latLonOutput">Click a button to get coordinates</span>
                 </p>
                 <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
@@ -254,18 +240,6 @@
             });
             map.addControl(new gpsControl());
             updateButtonText();
-
-            // --- Copy to Clipboard with ✅ feedback ---
-            function copyToClipboard(elementId, buttonEl) {
-                const text = document.getElementById(elementId).textContent;
-                navigator.clipboard.writeText(text).then(() => {
-                    const oldText = buttonEl.textContent;
-                    buttonEl.textContent = "✅";
-                    setTimeout(() => buttonEl.textContent = oldText, 1000);
-                }).catch(err => alert('Copy failed: ' + err));
-            }
-            document.getElementById('copyMgrsBtn').addEventListener('click', e => copyToClipboard('mgrsOutput', e.target));
-            document.getElementById('copyLatLonBtn').addEventListener('click', e => copyToClipboard('latLonOutput', e.target));
         });
     </script>
 </body>
