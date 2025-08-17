@@ -59,7 +59,7 @@
   <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const map = L.map('map').setView([9.0765, 7.3986], 6);
+      const map = L.map('map').setView([9.0765, 7.3986], 8); // Changed initial zoom from 6 to 8
 
       // Basemaps
       const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
@@ -69,7 +69,7 @@
       });
       const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
 
-      L.control.layers(
+      const layerControl = L.control.layers(
         {
           "OpenStreetMap": osmLayer,
           "Satellite": esriSatellite,
@@ -77,6 +77,15 @@
         },
         { "Labels": esriLabels }
       ).addTo(map);
+
+      // Add event listener for basemap changes
+      map.on('baselayerchange', (e) => {
+        if (e.name === 'Terrain') {
+          document.getElementById('statusOutput').textContent = 'Zoom in to see contour labels clearly';
+        } else {
+          document.getElementById('statusOutput').textContent = isTracking ? 'Tracking Active' : '';
+        }
+      });
 
       L.control.scale({ position: 'bottomleft', metric: true, imperial: true }).addTo(map);
 
@@ -174,7 +183,11 @@
       function stopTracking() {
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null; isTracking = false; isFirstFix = true;
-        getLocationBtn.textContent = "Start Tracking Location"; statusOutput.textContent = "";
+        getLocationBtn.textContent = "Start Tracking Location";
+        // Only clear status if not on Terrain layer
+        if (!map.hasLayer(esriTerrain)) {
+          statusOutput.textContent = "";
+        }
       }
 
       getLocationBtn.addEventListener('click', () => {
