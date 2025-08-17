@@ -1,424 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nigerian Army GPS Coordinate System</title>
-    <!-- Leaflet CSS with local fallback -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-          onerror="this.href='assets/leaflet.css'" />
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Arial', sans-serif;
-            background-color: #1a2b1a;
-            color: #ffffff;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        header {
-            text-align: center;
-            background-color: #2e4a2e;
-            padding: 10px;
-            border-bottom: 2px solid #4b704b;
-        }
-        h1 {
-            margin: 0;
-            font-size: 2em;
-            color: #d4d4d4;
-            text-transform: uppercase;
-        }
-        #map {
-            height: 60vh;
-            max-height: 500px;
-            border: 2px solid #4b704b;
-            margin: 20px 0;
-        }
-        #map.picking-mode {
-            cursor: crosshair;
-        }
-        .controls {
-            background-color: #2e4a2e;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-        .button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        button {
-            background-color: #4b704b;
-            color: #ffffff;
-            border: none;
-            padding: 10px 18px;
-            cursor: pointer;
-            font-size: 1em;
-            border-radius: 6px;
-            transition: background-color 0.3s;
-        }
-        button:hover, button:focus {
-            background-color: #5a8a5a;
-            outline: 2px solid #d4d4d4;
-        }
-        #selectEnemyBtn, #clearEnemyBtn {
-            background-color: #a00;
-        }
-        #selectEnemyBtn:hover, #selectEnemyBtn:focus,
-        #clearEnemyBtn:hover, #clearEnemyBtn:focus {
-            background-color: #c00;
-        }
-        .output {
-            margin-top: 15px;
-        }
-        .output h3 {
-            margin: 0 0 10px;
-            color: #d4d4d4;
-        }
-        .coord-line {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 6px 0;
-        }
-        .coord-line span {
-            font-weight: bold;
-            color: #e6e6e6;
-        }
-        .copy-btn {
-            background: #333;
-            font-size: 0.8em;
-            padding: 5px 8px;
-            margin-left: 8px;
-        }
-        .copy-btn.copied {
-            background-color: #5a8a5a;
-        }
-        .error, .status {
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .error { color: #ff4d4d; }
-        .status { color: #d4d4d4; }
-        .leaflet-control-layers {
-            background-color: #2e4a2e;
-            color: #ffffff;
-            border: 2px solid #4b704b;
-            border-radius: 5px;
-        }
-        .leaflet-control-layers label {
-            color: #d4d4d4;
-        }
-        .leaflet-control-scale {
-            background-color: #2e4a2e;
-            color: #d4d4d4;
-            border: 2px solid #4b704b;
-            border-radius: 4px;
-            padding: 2px 5px;
-            font-size: 0.9em;
-        }
-        .leaflet-control-scale-line {
-            background-color: #2e4a2e;
-            color: #d4d4d4;
-            border-color: #4b704b;
-        }
-        @media (max-width: 600px) {
-            #map { height: 50vh; }
-            button { padding: 8px 14px; font-size: 0.9em; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nigerian Army GPS Coordinate System</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        onerror="this.href='assets/leaflet.css'" />
+  <style>
+    body { margin: 0; font-family: 'Arial', sans-serif; background-color: #1a2b1a; color: #fff; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    header { text-align: center; background-color: #2e4a2e; padding: 10px; border-bottom: 2px solid #4b704b; }
+    h1 { margin: 0; font-size: 2em; color: #d4d4d4; text-transform: uppercase; }
+    #map { height: 60vh; max-height: 500px; border: 2px solid #4b704b; margin: 20px 0; }
+    #map.picking-mode { cursor: crosshair; }
+    .controls { background-color: #2e4a2e; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+    .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+    button { background-color: #4b704b; color: #fff; border: none; padding: 10px 18px; cursor: pointer; font-size: 1em; border-radius: 6px; transition: background-color 0.3s; }
+    button:hover, button:focus { background-color: #5a8a5a; outline: 2px solid #d4d4d4; }
+    #selectEnemyBtn, #clearEnemyBtn { background-color: #a00; }
+    #selectEnemyBtn:hover, #clearEnemyBtn:hover { background-color: #c00; }
+    .output { margin-top: 15px; }
+    .output h3 { margin: 0 0 10px; color: #d4d4d4; }
+    .coord-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
+    .coord-line span { font-weight: bold; color: #e6e6e6; }
+    .copy-btn { background: #333; font-size: 0.8em; padding: 5px 8px; margin-left: 8px; }
+    .copy-btn.copied { background-color: #5a8a5a; }
+    .error, .status { font-weight: bold; margin-top: 10px; }
+    .error { color: #ff4d4d; }
+    .status { color: #d4d4d4; }
+    @media (max-width: 600px) { #map { height: 50vh; } button { padding: 8px 14px; font-size: 0.9em; } }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Nigerian Army Coordinate System</h1>
-        </header>
-        <div id="map" role="region" aria-label="Interactive map for GPS coordinates"></div>
-        <div class="controls">
-            <div class="button-group">
-                <button id="getLocationBtn" aria-label="Toggle GPS tracking">Start Tracking Location</button>
-                <button id="selectEnemyBtn" aria-label="Select enemy coordinates">Select Enemy Coordinates</button>
-                <button id="clearEnemyBtn" aria-label="Clear enemy markers">Clear Enemy Markers</button>
-            </div>
-            <div class="output">
-                <h3>Coordinates</h3>
-                <div class="coord-line">
-                    <strong>MGRS:</strong> <span id="mgrsOutput">N/A</span>
-                    <button class="copy-btn" data-target="mgrsOutput" aria-label="Copy MGRS coordinates">📋 Copy</button>
-                </div>
-                <div class="coord-line">
-                    <strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span>
-                    <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">📋 Copy</button>
-                </div>
-                <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
-                <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
-                <p class="status" id="statusOutput" aria-live="polite"></p>
-                <p class="error" id="errorOutput" aria-live="polite"></p>
-            </div>
-        </div>
+  <div class="container">
+    <header><h1>Nigerian Army Coordinate System</h1></header>
+    <div id="map"></div>
+    <div class="controls">
+      <div class="button-group">
+        <button id="getLocationBtn">Start Tracking Location</button>
+        <button id="selectEnemyBtn">Select Enemy Coordinates</button>
+        <button id="clearEnemyBtn">Clear Enemy Markers</button>
+      </div>
+      <div class="output">
+        <h3>Coordinates</h3>
+        <div class="coord-line"><strong>MGRS:</strong> <span id="mgrsOutput">N/A</span> <button class="copy-btn" data-target="mgrsOutput">📋 Copy</button></div>
+        <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput">📋 Copy</button></div>
+        <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput">📋 Copy</button></div>
+        <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput">📋 Copy</button></div>
+        <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
+        <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
+        <p class="status" id="statusOutput"></p>
+        <p class="error" id="errorOutput"></p>
+      </div>
     </div>
+  </div>
 
-    <!-- Leaflet JS with local fallback -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
-            onerror="this.src='assets/leaflet.js'"></script>
-    <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js" 
-            onerror="this.src='assets/proj4.js'"></script>
-    <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js" 
-            onerror="this.src='assets/proj4-mgrs.js'"></script>
-    <script>
-        // Service worker registration for offline support
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Service Worker registered'))
-                    .catch(err => console.error('Service Worker registration failed:', err));
-            });
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const map = L.map('map').setView([9.0765, 7.3986], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+      let gpsMarker = null;
+      const enemyLayer = L.layerGroup().addTo(map);
+
+      const getLocationBtn = document.getElementById('getLocationBtn');
+      const selectEnemyBtn = document.getElementById('selectEnemyBtn');
+      const clearEnemyBtn = document.getElementById('clearEnemyBtn');
+      const errorOutput = document.getElementById('errorOutput');
+      const statusOutput = document.getElementById('statusOutput');
+
+      let watchId = null, isTracking = false, isPaused = false, isFirstFix = true;
+
+      function toDMS(lat, lon) {
+        function convert(coord, pos, neg) {
+          const absolute = Math.abs(coord);
+          const deg = Math.floor(absolute);
+          const minFloat = (absolute - deg) * 60;
+          const min = Math.floor(minFloat);
+          const sec = ((minFloat - min) * 60).toFixed(2);
+          const dir = coord >= 0 ? pos : neg;
+          return `${deg}°${min}'${sec}" ${dir}`;
         }
+        return `${convert(lat, "N", "S")}, ${convert(lon, "E", "W")}`;
+      }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initial map setup
-            const savedView = localStorage.getItem('lastMapView');
-            const defaultView = { lat: 9.0765, lng: 7.3986, zoom: 6 };
-            const initialView = savedView ? JSON.parse(savedView) : defaultView;
-            const map = L.map('map', {
-                attributionControl: true,
-                zoomControl: true
-            }).setView([initialView.lat, initialView.lng], initialView.zoom);
+      function toUTM(lat, lon) {
+        try {
+          const utmProj = `+proj=utm +zone=${Math.floor((lon + 180) / 6) + 1} +datum=WGS84 +units=m +no_defs`;
+          const [x, y] = proj4(utmProj, [lon, lat]);
+          return `Zone ${Math.floor((lon + 180) / 6) + 1}N: ${x.toFixed(2)}mE, ${y.toFixed(2)}mN`;
+        } catch {
+          return "N/A";
+        }
+      }
 
-            // Basemaps with offline fallback
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors',
-                errorTileUrl: 'assets/tiles/{z}/{x}/{y}.png'
-            }).addTo(map);
-            const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-            const esriTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}');
-            const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
-            L.control.layers({
-                "OpenStreetMap": osmLayer,
-                "Satellite": esriSatellite,
-                "Terrain": esriTerrain
-            }, { "Labels": esriLabels }).addTo(map);
+      function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
+        let mgrs;
+        try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
-            // Add scale bar
-            L.control.scale({
-                position: 'bottomleft',
-                metric: true,
-                imperial: true,
-                maxWidth: 100
-            }).addTo(map);
+        document.getElementById('mgrsOutput').textContent = mgrs;
+        document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+        document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
+        document.getElementById('utmOutput').textContent = toUTM(lat, lon);
+        document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
+        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
-            // Save map view
-            map.on('moveend', () => {
-                const center = map.getCenter();
-                localStorage.setItem('lastMapView', JSON.stringify({ lat: center.lat, lng: center.lng, zoom: map.getZoom() }));
-            });
+        if (isGps) {
+          if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
+          else gpsMarker = L.marker([lat, lon]).addTo(map);
+          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
+        } else {
+          L.marker([lat, lon], { icon: new L.Icon.Default() }).addTo(enemyLayer);
+        }
+      }
 
-            // Icons with local fallback
-            const gpsIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25,41], iconAnchor: [12,41],
-                iconUrlFallback: 'assets/marker-icon-2x-blue.png',
-                shadowUrlFallback: 'assets/marker-shadow.png'
-            });
-            const enemyIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25,41], iconAnchor: [12,41],
-                iconUrlFallback: 'assets/marker-icon-2x-red.png',
-                shadowUrlFallback: 'assets/marker-shadow.png'
-            });
+      function startTracking() {
+        watchId = navigator.geolocation.watchPosition(
+          pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+          err => { errorOutput.textContent = `Error: ${err.message}`; stopTracking(); },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+        );
+        isTracking = true; isPaused = false;
+        getLocationBtn.textContent = "Pause Tracking";
+        statusOutput.textContent = "Tracking Active";
+      }
 
-            // Custom icon fallback handling
-            [gpsIcon, enemyIcon].forEach(icon => {
-                const img = new Image();
-                img.src = icon.options.iconUrl;
-                img.onerror = () => { icon.options.iconUrl = icon.options.iconUrlFallback; };
-                const shadow = new Image();
-                shadow.src = icon.options.shadowUrl;
-                shadow.onerror = () => { icon.options.shadowUrl = icon.options.shadowUrlFallback; };
-            });
+      function stopTracking() {
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        watchId = null; isTracking = false; isPaused = false; isFirstFix = true;
+        getLocationBtn.textContent = "Start Tracking Location"; statusOutput.textContent = "";
+      }
 
-            // Layers
-            let gpsMarker = null;
-            const enemyLayer = L.layerGroup().addTo(map);
-            const MAX_ENEMY_MARKERS = 10;
+      getLocationBtn.addEventListener('click', () => {
+        if (isTracking) { stopTracking(); }
+        else { startTracking(); }
+      });
 
-            // Controls
-            const getLocationBtn = document.getElementById('getLocationBtn');
-            const selectEnemyBtn = document.getElementById('selectEnemyBtn');
-            const clearEnemyBtn = document.getElementById('clearEnemyBtn');
-            const errorOutput = document.getElementById('errorOutput');
-            const statusOutput = document.getElementById('statusOutput');
-            let watchId = null, isTracking = false, isPaused = false, isFirstFix = true;
+      selectEnemyBtn.addEventListener('click', () => {
+        map.once('click', e => updateCoordinates(e.latlng.lat, e.latlng.lng, null, false));
+      });
 
-            // Helpers
-            function updateButtonText() {
-                getLocationBtn.textContent = isTracking ? (isPaused ? 'Resume Tracking' : 'Pause Tracking') : 'Start Tracking Location';
-                statusOutput.textContent = isTracking ? (isPaused ? 'Tracking Paused' : 'Tracking Active') : '';
-            }
-            function setError(msg, duration = 6000) {
-                errorOutput.textContent = msg;
-                setTimeout(() => { if (errorOutput.textContent === msg) errorOutput.textContent = ''; }, duration);
-            }
-            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
-                let mgrs;
-                try {
-                    mgrs = proj4.mgrs.forward([lon, lat]);
-                } catch (e) {
-                    setError('Error converting to MGRS. Invalid coordinates.');
-                    mgrs = 'N/A';
-                }
-                document.getElementById('mgrsOutput').textContent = mgrs;
-                document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-                document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : 'N/A';
-                document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+      clearEnemyBtn.addEventListener('click', () => {
+        enemyLayer.clearLayers();
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+      });
 
-                if (isGps) {
-                    if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
-                    else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
-                    if (isFirstFix) {
-                        map.flyTo([lat, lon], 15, { animate: true, duration: 1 }); // Smooth zoom on first fix
-                        isFirstFix = false;
-                    } else {
-                        map.flyTo([lat, lon], map.getZoom(), { animate: true, duration: 1 }); // Smooth pan
-                    }
-                } else {
-                    L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
-                }
-            }
-            function startTracking() {
-                if (!window.isSecureContext) {
-                    setError('Geolocation requires a secure context (HTTPS). Please use a secure connection.');
-                    return;
-                }
-                isFirstFix = true; // Reset first fix flag
-                watchId = navigator.geolocation.watchPosition(
-                    pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
-                    err => {
-                        setError(`Location error: ${err.message}. Ensure location services are enabled and try reloading the page.`);
-                        stopTracking();
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-                );
-                isTracking = true;
-                isPaused = false;
-                updateButtonText();
-            }
-            function stopTracking() {
-                if (watchId) navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-                isTracking = false;
-                isPaused = false;
-                isFirstFix = true; // Reset for next tracking session
-                updateButtonText();
-            }
-
-            // GPS tracking button
-            getLocationBtn.addEventListener('click', () => {
-                if (!navigator.geolocation) {
-                    setError('Geolocation not supported by your browser. Please use a modern browser or enable location services.');
-                    return;
-                }
-                if (isTracking) {
-                    if (isPaused) startTracking();
-                    else {
-                        navigator.geolocation.clearWatch(watchId);
-                        isPaused = true;
-                        updateButtonText();
-                    }
-                } else {
-                    startTracking();
-                }
-            });
-
-            // Keyboard support for buttons
-            getLocationBtn.addEventListener('keydown', e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    getLocationBtn.click();
-                }
-            });
-
-            // Enemy marker button
-            selectEnemyBtn.addEventListener('click', () => {
-                if (enemyLayer.getLayers().length >= MAX_ENEMY_MARKERS) {
-                    setError('Maximum enemy markers reached. Clear markers to add more.');
-                    return;
-                }
-                stopTracking();
-                map.getContainer().classList.add('picking-mode');
-                setError('Click map to place enemy marker');
-                map.once('click', e => {
-                    updateCoordinates(e.latlng.lat, e.latlng.lng, null, false);
-                    map.getContainer().classList.remove('picking-mode');
-                });
-            });
-
-            selectEnemyBtn.addEventListener('keydown', e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    selectEnemyBtn.click();
-                }
-            });
-
-            // Clear enemy markers button
-            clearEnemyBtn.addEventListener('click', () => {
-                enemyLayer.clearLayers();
-                document.getElementById('mgrsOutput').textContent = 'N/A';
-                document.getElementById('latLonOutput').textContent = 'N/A';
-                document.getElementById('accuracyOutput').textContent = 'N/A';
-                document.getElementById('timestampOutput').textContent = 'N/A';
-                setError('Enemy markers cleared');
-            });
-
-            clearEnemyBtn.addEventListener('keydown', e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    clearEnemyBtn.click();
-                }
-            });
-
-            // Copy buttons
-            document.querySelectorAll('.copy-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const target = document.getElementById(btn.dataset.target);
-                    navigator.clipboard.writeText(target.textContent).then(() => {
-                        setError('Copied!');
-                        btn.classList.add('copied');
-                        setTimeout(() => btn.classList.remove('copied'), 2000);
-                    }).catch(() => setError('Failed to copy. Please try again.'));
-                });
-                btn.addEventListener('keydown', e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        btn.click();
-                    }
-                });
-            });
-
-            // Keyboard navigation for map
-            map.getContainer().setAttribute('tabindex', '0');
-            map.getContainer().addEventListener('keydown', e => {
-                const step = 0.01;
-                const center = map.getCenter();
-                if (e.key === 'ArrowUp') map.panTo([center.lat + step, center.lng]);
-                if (e.key === 'ArrowDown') map.panTo([center.lat - step, center.lng]);
-                if (e.key === 'ArrowLeft') map.panTo([center.lat, center.lng - step]);
-                if (e.key === 'ArrowRight') map.panTo([center.lat, center.lng + step]);
-                if (e.key === 'Enter' && map.getContainer().classList.contains('picking-mode')) {
-                    updateCoordinates(center.lat, center.lng, null, false);
-                    map.getContainer().classList.remove('picking-mode');
-                }
-            });
-
-            updateButtonText();
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = document.getElementById(btn.dataset.target);
+          navigator.clipboard.writeText(target.textContent);
+          btn.classList.add('copied'); setTimeout(()=>btn.classList.remove('copied'), 2000);
         });
-    </script>
+      });
+    });
+  </script>
 </body>
 </html>
