@@ -168,152 +168,257 @@
             onerror="this.src='assets/leaflet.js'"></script>
     <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js" 
             onerror="this.src='assets/proj4.js'"></script>
-    <script src="https://unpkg.getElementById('mgrsOutput').textContent = mgrs;
-        document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-        document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : 'N/A';
-        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+    <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js" 
+            onerror="this.src='assets/proj4-mgrs.js'"></script>
+    <script>
+        // Service worker registration for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.error('Service Worker registration failed:', err));
+            });
+        }
 
-        if (isGps) {
-            if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
-            else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
-            if (isFirstFix) {
-                map.setView([lat, lon], 15); // Instant move, no animation
-                isFirstFix = false;
-            } else {
-                map.panTo([lat, lon]); // Instant pan, no animation
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initial map setup
+            const savedView = localStorage.getItem('lastMapView');
+            const defaultView = { lat: 9.0765, lng: 7.3986, zoom: 6 };
+            const initialView = savedView ? JSON.parse(savedView) : defaultView;
+            const map = L.map('map', {
+                attributionControl: true,
+                zoomControl: true
+            }).setView([initialView.lat, initialView.lng], initialView.zoom);
+
+            // Basemaps with offline fallback
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                errorTileUrl: 'assets/tiles/{z}/{x}/{y}.png'
+            }).addTo(map);
+            const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+            const esriTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}');
+            const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
+            L.control.layers({
+                "OpenStreetMap": osmLayer,
+                "Satellite": esriSatellite,
+                "Terrain": esriTerrain
+            }, { "Labels": esriLabels }).addTo(map);
+
+            // Add scale bar
+            L.control.scale({
+                position: 'bottomleft',
+                metric: true,
+                imperial: true,
+                maxWidth: 100
+            }).addTo(map);
+
+            // Save map view
+            map.on('moveend', () => {
+                const center = map.getCenter();
+                localStorage.setItem('lastMapView', JSON.stringify({ lat: center.lat, lng: center.lng, zoom: map.getZoom() }));
+            });
+
+            // Icons with local fallback
+            const gpsIcon = new L.Icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                iconSize: [25,41], iconAnchor: [12,41],
+                iconUrlFallback: 'assets/marker-icon-2x-blue.png',
+                shadowUrlFallback: 'assets/marker-shadow.png'
+            });
+            const enemyIcon = new L.Icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                iconSize: [25,41], iconAnchor: [12,41],
+                iconUrlFallback: 'assets/marker-icon-2x-red.png',
+                shadowUrlFallback: 'assets/marker-shadow.png'
+            });
+
+            // Custom icon fallback handling
+            [gpsIcon, enemyIcon].forEach(icon => {
+                const img = new Image();
+                img.src = icon.options.iconUrl;
+                img.onerror = () => { icon.options.iconUrl = icon.options.iconUrlFallback; };
+                const shadow = new Image();
+                shadow.src = icon.options.shadowUrl;
+                shadow.onerror = () => { icon.options.shadowUrl = icon.options.shadowUrlFallback; };
+            });
+
+            // Layers
+            let gpsMarker = null;
+            const enemyLayer = L.layerGroup().addTo(map);
+            const MAX_ENEMY_MARKERS = 10;
+
+            // Controls
+            const getLocationBtn = document.getElementById('getLocationBtn');
+            const selectEnemyBtn = document.getElementById('selectEnemyBtn');
+            const clearEnemyBtn = document.getElementById('clearEnemyBtn');
+            const errorOutput = document.getElementById('errorOutput');
+            const statusOutput = document.getElementById('statusOutput');
+            let watchId = null, isTracking = false, isPaused = false, isFirstFix = true;
+
+            // Helpers
+            function updateButtonText() {
+                getLocationBtn.textContent = isTracking ? (isPaused ? 'Resume Tracking' : 'Pause Tracking') : 'Start Tracking Location';
+                statusOutput.textContent = isTracking ? (isPaused ? 'Tracking Paused' : 'Tracking Active') : '';
             }
-            lastUpdateTime = now;
-        } else {
-            L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
-        }
-    }
-    function startTracking() {
-        if (!window.isSecureContext) {
-            setError('Geolocation requires a secure context (HTTPS). Please use a secure connection.');
-            return;
-        }
-        isFirstFix = true; // Reset first fix flag
-        watchId = navigator.geolocation.watchPosition(
-            pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
-            err => {
-                setError(`Location error: ${err.message}. Ensure location services are enabled and try reloading the page.`);
-                stopTracking();
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-        );
-        isTracking = true;
-        isPaused = false;
-        updateButtonText();
-    }
-    function stopTracking() {
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        isTracking = false;
-        isPaused = false;
-        isFirstFix = true; // Reset for next tracking session
-        updateButtonText();
-    }
+            function setError(msg, duration = 6000) {
+                errorOutput.textContent = msg;
+                setTimeout(() => { if (errorOutput.textContent === msg) errorOutput.textContent = ''; }, duration);
+            }
+            function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
+                let mgrs;
+                try {
+                    mgrs = proj4.mgrs.forward([lon, lat]);
+                } catch (e) {
+                    setError('Error converting to MGRS. Invalid coordinates.');
+                    mgrs = 'N/A';
+                }
+                document.getElementById('mgrsOutput').textContent = mgrs;
+                document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+                document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : 'N/A';
+                document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
-    // GPS tracking button
-    getLocationBtn.addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            setError('Geolocation not supported by your browser. Please use a modern browser or enable location services.');
-            return;
-        }
-        if (isTracking) {
-            if (isPaused) startTracking();
-            else {
-                navigator.geolocation.clearWatch(watchId);
-                isPaused = true;
+                if (isGps) {
+                    if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
+                    else gpsMarker = L.marker([lat, lon], { icon: gpsIcon }).addTo(map);
+                    if (isFirstFix) {
+                        map.flyTo([lat, lon], 15, { animate: true, duration: 1 }); // Smooth zoom on first fix
+                        isFirstFix = false;
+                    } else {
+                        map.flyTo([lat, lon], map.getZoom(), { animate: true, duration: 1 }); // Smooth pan
+                    }
+                } else {
+                    L.marker([lat, lon], { icon: enemyIcon }).addTo(enemyLayer);
+                }
+            }
+            function startTracking() {
+                if (!window.isSecureContext) {
+                    setError('Geolocation requires a secure context (HTTPS). Please use a secure connection.');
+                    return;
+                }
+                isFirstFix = true; // Reset first fix flag
+                watchId = navigator.geolocation.watchPosition(
+                    pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+                    err => {
+                        setError(`Location error: ${err.message}. Ensure location services are enabled and try reloading the page.`);
+                        stopTracking();
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+                );
+                isTracking = true;
+                isPaused = false;
                 updateButtonText();
             }
-        } else {
-            startTracking();
-        }
-    });
-
-    // Keyboard support for buttons
-    getLocationBtn.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            getLocationBtn.click();
-        }
-    });
-
-    // Enemy marker button
-    selectEnemyBtn.addEventListener('click', () => {
-        if (enemyLayer.getLayers().length >= MAX_ENEMY_MARKERS) {
-            setError('Maximum enemy markers reached. Clear markers to add more.');
-            return;
-        }
-        stopTracking();
-        map.getContainer().classList.add('picking-mode');
-        setError('Click map to place enemy marker');
-        map.once('click', e => {
-            updateCoordinates(e.latlng.lat, e.latlng.lng, null, false);
-            map.getContainer().classList.remove('picking-mode');
-        });
-    });
-
-    selectEnemyBtn.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            selectEnemyBtn.click();
-        }
-    });
-
-    // Clear enemy markers button
-    clearEnemyBtn.addEventListener('click', () => {
-        enemyLayer.clearLayers();
-        document.getElementById('mgrsOutput').textContent = 'N/A';
-        document.getElementById('latLonOutput').textContent = 'N/A';
-        document.getElementById('accuracyOutput').textContent = 'N/A';
-        document.getElementById('timestampOutput').textContent = 'N/A';
-        setError('Enemy markers cleared');
-    });
-
-    clearEnemyBtn.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            clearEnemyBtn.click();
-        }
-    });
-
-    // Copy buttons
-    document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const target = document.getElementById(btn.dataset.target);
-            navigator.clipboard.writeText(target.textContent).then(() => {
-                setError('Copied!');
-                btn.classList.add('copied');
-                setTimeout(() => btn.classList.remove('copied'), 2000);
-            }).catch(() => setError('Failed to copy. Please try again.'));
-        });
-        btn.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                btn.click();
+            function stopTracking() {
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                isTracking = false;
+                isPaused = false;
+                isFirstFix = true; // Reset for next tracking session
+                updateButtonText();
             }
+
+            // GPS tracking button
+            getLocationBtn.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    setError('Geolocation not supported by your browser. Please use a modern browser or enable location services.');
+                    return;
+                }
+                if (isTracking) {
+                    if (isPaused) startTracking();
+                    else {
+                        navigator.geolocation.clearWatch(watchId);
+                        isPaused = true;
+                        updateButtonText();
+                    }
+                } else {
+                    startTracking();
+                }
+            });
+
+            // Keyboard support for buttons
+            getLocationBtn.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    getLocationBtn.click();
+                }
+            });
+
+            // Enemy marker button
+            selectEnemyBtn.addEventListener('click', () => {
+                if (enemyLayer.getLayers().length >= MAX_ENEMY_MARKERS) {
+                    setError('Maximum enemy markers reached. Clear markers to add more.');
+                    return;
+                }
+                stopTracking();
+                map.getContainer().classList.add('picking-mode');
+                setError('Click map to place enemy marker');
+                map.once('click', e => {
+                    updateCoordinates(e.latlng.lat, e.latlng.lng, null, false);
+                    map.getContainer().classList.remove('picking-mode');
+                });
+            });
+
+            selectEnemyBtn.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    selectEnemyBtn.click();
+                }
+            });
+
+            // Clear enemy markers button
+            clearEnemyBtn.addEventListener('click', () => {
+                enemyLayer.clearLayers();
+                document.getElementById('mgrsOutput').textContent = 'N/A';
+                document.getElementById('latLonOutput').textContent = 'N/A';
+                document.getElementById('accuracyOutput').textContent = 'N/A';
+                document.getElementById('timestampOutput').textContent = 'N/A';
+                setError('Enemy markers cleared');
+            });
+
+            clearEnemyBtn.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    clearEnemyBtn.click();
+                }
+            });
+
+            // Copy buttons
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    navigator.clipboard.writeText(target.textContent).then(() => {
+                        setError('Copied!');
+                        btn.classList.add('copied');
+                        setTimeout(() => btn.classList.remove('copied'), 2000);
+                    }).catch(() => setError('Failed to copy. Please try again.'));
+                });
+                btn.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        btn.click();
+                    }
+                });
+            });
+
+            // Keyboard navigation for map
+            map.getContainer().setAttribute('tabindex', '0');
+            map.getContainer().addEventListener('keydown', e => {
+                const step = 0.01;
+                const center = map.getCenter();
+                if (e.key === 'ArrowUp') map.panTo([center.lat + step, center.lng]);
+                if (e.key === 'ArrowDown') map.panTo([center.lat - step, center.lng]);
+                if (e.key === 'ArrowLeft') map.panTo([center.lat, center.lng - step]);
+                if (e.key === 'ArrowRight') map.panTo([center.lat, center.lng + step]);
+                if (e.key === 'Enter' && map.getContainer().classList.contains('picking-mode')) {
+                    updateCoordinates(center.lat, center.lng, null, false);
+                    map.getContainer().classList.remove('picking-mode');
+                }
+            });
+
+            updateButtonText();
         });
-    });
-
-    // Keyboard navigation for map
-    map.getContainer().setAttribute('tabindex', '0');
-    map.getContainer().addEventListener('keydown', e => {
-        const step = 0.01;
-        const center = map.getCenter();
-        if (e.key === 'ArrowUp') map.panTo([center.lat + step, center.lng]);
-        if (e.key === 'ArrowDown') map.panTo([center.lat - step, center.lng]);
-        if (e.key === 'ArrowLeft') map.panTo([center.lat, center.lng - step]);
-        if (e.key === 'ArrowRight') map.panTo([center.lat, center.lng + step]);
-        if (e.key === 'Enter' && map.getContainer().classList.contains('picking-mode')) {
-            updateCoordinates(center.lat, center.lng, null, false);
-            map.getContainer().classList.remove('picking-mode');
-        }
-    });
-
-    updateButtonText();
-});
-</script>
+    </script>
 </body>
 </html>
