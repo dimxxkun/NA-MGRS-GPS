@@ -59,7 +59,7 @@
   <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const map = L.map('map').setView([9.0765, 7.3986], 8);
+      const map = L.map('map').setView([9.0765, 7.3986], 8); // Changed initial zoom from 6 to 8
 
       // Basemaps
       const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
@@ -159,11 +159,11 @@
         if (isGps) {
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map); // Use greenIcon for GPS markers
-          if (isFirstFix) { map.flyTo([lat, lon], 12); isFirstFix = false; } // Changed zoom from 15 to 12
+          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else {
           enemyCounter++; // Increment enemy marker counter
           const marker = L.marker([lat, lon], { icon: redIcon })
-            .bindPopup(`Enemy ${enemyCounter} (Imagery: ~2020–2025)`)
+            .bindPopup(`Enemy ${enemyCounter} (Imagery: ~2020–2025)`) // Updated popup with imagery date
             .addTo(enemyLayer)
             .openPopup(); // Add marker with numbered popup and open it
         }
