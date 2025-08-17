@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nigerian Army GPS Coordinate System</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        onerror="this.href='assets/leaflet.css'" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin: 0; font-family: 'Arial', sans-serif; background-color: #1a2b1a; color: #fff; }
     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
@@ -61,7 +60,23 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const map = L.map('map').setView([9.0765, 7.3986], 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+      // Basemaps
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+      const esriTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}');
+      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
+
+      L.control.layers(
+        {
+          "OpenStreetMap": osmLayer,
+          "Satellite": esriSatellite,
+          "Terrain": esriTerrain
+        },
+        { "Labels": esriLabels }
+      ).addTo(map);
+
+      L.control.scale({ position: 'bottomleft', metric: true, imperial: true }).addTo(map);
 
       let gpsMarker = null;
       const enemyLayer = L.layerGroup().addTo(map);
@@ -72,7 +87,7 @@
       const errorOutput = document.getElementById('errorOutput');
       const statusOutput = document.getElementById('statusOutput');
 
-      let watchId = null, isTracking = false, isPaused = false, isFirstFix = true;
+      let watchId = null, isTracking = false, isFirstFix = true;
 
       function toDMS(lat, lon) {
         function convert(coord, pos, neg) {
@@ -89,9 +104,10 @@
 
       function toUTM(lat, lon) {
         try {
-          const utmProj = `+proj=utm +zone=${Math.floor((lon + 180) / 6) + 1} +datum=WGS84 +units=m +no_defs`;
+          const zone = Math.floor((lon + 180) / 6) + 1;
+          const utmProj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
           const [x, y] = proj4(utmProj, [lon, lat]);
-          return `Zone ${Math.floor((lon + 180) / 6) + 1}N: ${x.toFixed(2)}mE, ${y.toFixed(2)}mN`;
+          return `Zone ${zone}N: ${x.toFixed(2)}mE, ${y.toFixed(2)}mN`;
         } catch {
           return "N/A";
         }
@@ -123,20 +139,19 @@
           err => { errorOutput.textContent = `Error: ${err.message}`; stopTracking(); },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
         );
-        isTracking = true; isPaused = false;
-        getLocationBtn.textContent = "Pause Tracking";
+        isTracking = true;
+        getLocationBtn.textContent = "Stop Tracking";
         statusOutput.textContent = "Tracking Active";
       }
 
       function stopTracking() {
         if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null; isTracking = false; isPaused = false; isFirstFix = true;
+        watchId = null; isTracking = false; isFirstFix = true;
         getLocationBtn.textContent = "Start Tracking Location"; statusOutput.textContent = "";
       }
 
       getLocationBtn.addEventListener('click', () => {
-        if (isTracking) { stopTracking(); }
-        else { startTracking(); }
+        if (isTracking) { stopTracking(); } else { startTracking(); }
       });
 
       selectEnemyBtn.addEventListener('click', () => {
