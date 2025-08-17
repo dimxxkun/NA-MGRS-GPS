@@ -81,6 +81,16 @@
       let gpsMarker = null;
       const enemyLayer = L.layerGroup().addTo(map);
 
+      // Define a custom red icon for enemy markers
+      const redIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+
       const getLocationBtn = document.getElementById('getLocationBtn');
       const selectEnemyBtn = document.getElementById('selectEnemyBtn');
       const clearEnemyBtn = document.getElementById('clearEnemyBtn');
@@ -129,7 +139,7 @@
           else gpsMarker = L.marker([lat, lon]).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else {
-          L.marker([lat, lon], { icon: new L.Icon.Default() }).addTo(enemyLayer);
+          L.marker([lat, lon], { icon: redIcon }).addTo(enemyLayer); // Use redIcon for enemy markers
         }
       }
 
@@ -167,7 +177,7 @@
         btn.addEventListener('click', () => {
           const target = document.getElementById(btn.dataset.target);
           navigator.clipboard.writeText(target.textContent);
-          btn.classList.add('copied'); setTimeout(()=>btn.classList.remove('copied'), 2000);
+          btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 2000);
         });
       });
     });
