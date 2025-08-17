@@ -1,133 +1,175 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Nigeria Army GPS App</title>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
+  <title>Nigerian Army GPS Coordinate System</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
-    #map { height: 100vh; }
-    .coords-box {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      background: white;
-      padding: 8px;
-      border-radius: 6px;
-      font-size: 13px;
-      line-height: 1.4;
-      box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      max-width: 280px;
-    }
+    body { margin: 0; font-family: 'Arial', sans-serif; background-color: #1a2b1a; color: #fff; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    header { text-align: center; background-color: #2e4a2e; padding: 10px; border-bottom: 2px solid #4b704b; }
+    h1 { margin: 0; font-size: 2em; color: #d4d4d4; text-transform: uppercase; }
+    #map { height: 60vh; max-height: 500px; border: 2px solid #4b704b; margin: 20px 0; }
+    #map.picking-mode { cursor: crosshair; }
+    .controls { background-color: #2e4a2e; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+    .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+    button { background-color: #4b704b; color: #fff; border: none; padding: 10px 18px; cursor: pointer; font-size: 1em; border-radius: 6px; transition: background-color 0.3s; }
+    button:hover, button:focus { background-color: #5a8a5a; outline: 2px solid #d4d4d4; }
+    #selectEnemyBtn, #clearEnemyBtn { background-color: #a00; }
+    #selectEnemyBtn:hover, #clearEnemyBtn:hover { background-color: #c00; }
+    .output { margin-top: 15px; }
+    .output h3 { margin: 0 0 10px; color: #d4d4d4; }
+    .coord-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
+    .coord-line span { font-weight: bold; color: #e6e6e6; }
+    .copy-btn { background: #333; font-size: 0.8em; padding: 5px 8px; margin-left: 8px; }
+    .copy-btn.copied { background-color: #5a8a5a; }
+    .error, .status { font-weight: bold; margin-top: 10px; }
+    .error { color: #ff4d4d; }
+    .status { color: #d4d4d4; }
+    @media (max-width: 600px) { #map { height: 50vh; } button { padding: 8px 14px; font-size: 0.9em; } }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div class="coords-box" id="coords">Click map or use GPS to get coordinates...</div>
+  <div class="container">
+    <header><h1>Nigerian Army Coordinate System</h1></header>
+    <div id="map"></div>
+    <div class="controls">
+      <div class="button-group">
+        <button id="getLocationBtn">Start Tracking Location</button>
+        <button id="selectEnemyBtn">Select Enemy Coordinates</button>
+        <button id="clearEnemyBtn">Clear Enemy Markers</button>
+      </div>
+      <div class="output">
+        <h3>Coordinates</h3>
+        <div class="coord-line"><strong>MGRS:</strong> <span id="mgrsOutput">N/A</span> <button class="copy-btn" data-target="mgrsOutput">📋 Copy</button></div>
+        <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput">📋 Copy</button></div>
+        <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput">📋 Copy</button></div>
+        <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput">📋 Copy</button></div>
+        <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
+        <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
+        <p class="status" id="statusOutput"></p>
+        <p class="error" id="errorOutput"></p>
+      </div>
+    </div>
+  </div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- proj4 for UTM -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
-  <!-- mgrs for MGRS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mgrs/1.0.0/mgrs.min.js"></script>
-
+  <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
   <script>
-    // Init map
-    const map = L.map('map').setView([9.0765, 7.3986], 7);
+    document.addEventListener('DOMContentLoaded', () => {
+      const map = L.map('map').setView([9.0765, 7.3986], 6);
 
-    // Basemaps
-    const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19, attribution: "© OSM"
-    }).addTo(map);
+      // Basemaps
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+      const esriTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}');
+      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
 
-    const esriSat = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", 
-      { attribution: "Tiles © Esri" }
-    );
+      L.control.layers(
+        {
+          "OpenStreetMap": osmLayer,
+          "Satellite": esriSatellite,
+          "Terrain": esriTerrain
+        },
+        { "Labels": esriLabels }
+      ).addTo(map);
 
-    const esriSatLabels = L.tileLayer(
-      "https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", 
-      { attribution: "Labels © Esri", maxZoom: 19 }
-    );
+      L.control.scale({ position: 'bottomleft', metric: true, imperial: true }).addTo(map);
 
-    const terrain = L.tileLayer(
-      "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", 
-      { attribution: "© OpenTopoMap" }
-    );
+      let gpsMarker = null;
+      const enemyLayer = L.layerGroup().addTo(map);
 
-    // Layer control
-    const esriSatelliteWithLabels = L.layerGroup([esriSat, esriSatLabels]);
-    L.control.layers({
-      "OpenStreetMap": osm,
-      "Esri Satellite": esriSat,
-      "Esri Satellite + Labels": esriSatelliteWithLabels,
-      "2D Terrain": terrain
-    }).addTo(map);
+      const getLocationBtn = document.getElementById('getLocationBtn');
+      const selectEnemyBtn = document.getElementById('selectEnemyBtn');
+      const clearEnemyBtn = document.getElementById('clearEnemyBtn');
+      const errorOutput = document.getElementById('errorOutput');
+      const statusOutput = document.getElementById('statusOutput');
 
-    // Custom Icons
-    const friendlyIcon = L.icon({
-      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
+      let watchId = null, isTracking = false, isFirstFix = true;
 
-    const enemyIcon = L.icon({
-      iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-
-    // Example markers
-    L.marker([9.0765, 7.3986], { icon: friendlyIcon }).addTo(map).bindPopup("✅ Friendly Unit - Abuja");
-    L.marker([8.5, 7.0], { icon: enemyIcon }).addTo(map).bindPopup("⚠️ Enemy Unit");
-
-    // Coord conversion helpers
-    function toDMS(lat, lon) {
-      function convert(coord, isLat) {
-        const dir = coord < 0 ? (isLat ? 'S' : 'W') : (isLat ? 'N' : 'E');
-        const abs = Math.abs(coord);
-        const d = Math.floor(abs);
-        const m = Math.floor((abs - d) * 60);
-        const s = ((abs - d - m/60) * 3600).toFixed(2);
-        return `${d}°${m}'${s}"${dir}`;
+      function toDMS(lat, lon) {
+        function convert(coord, pos, neg) {
+          const absolute = Math.abs(coord);
+          const deg = Math.floor(absolute);
+          const minFloat = (absolute - deg) * 60;
+          const min = Math.floor(minFloat);
+          const sec = ((minFloat - min) * 60).toFixed(2);
+          const dir = coord >= 0 ? pos : neg;
+          return `${deg}°${min}'${sec}" ${dir}`;
+        }
+        return `${convert(lat, "N", "S")}, ${convert(lon, "E", "W")}`;
       }
-      return `${convert(lat,true)}, ${convert(lon,false)}`;
-    }
 
-    function toUTM(lat, lon) {
-      const zone = Math.floor((lon + 180) / 6) + 1;
-      const projStr = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
-      const xy = proj4(projStr, [lon, lat]);
-      return `Zone ${zone} | Easting: ${xy[0].toFixed(2)}, Northing: ${xy[1].toFixed(2)}`;
-    }
+      function toUTM(lat, lon) {
+        try {
+          const zone = Math.floor((lon + 180) / 6) + 1;
+          const utmProj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
+          const [x, y] = proj4(utmProj, [lon, lat]);
+          return `Zone ${zone}N: ${x.toFixed(2)}mE, ${y.toFixed(2)}mN`;
+        } catch {
+          return "N/A";
+        }
+      }
 
-    function toMGRS(lat, lon) {
-      return mgrs.forward([lon, lat], 5);
-    }
+      function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
+        let mgrs;
+        try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
-    // Update coord display
-    function updateCoords(lat, lon) {
-      const box = document.getElementById("coords");
-      box.innerHTML = `
-        <b>Latitude/Longitude:</b><br>${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
-        <b>DMS:</b><br>${toDMS(lat, lon)}<br>
-        <b>UTM:</b><br>${toUTM(lat, lon)}<br>
-        <b>MGRS:</b><br>${toMGRS(lat, lon)}
-      `;
-    }
+        document.getElementById('mgrsOutput').textContent = mgrs;
+        document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+        document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
+        document.getElementById('utmOutput').textContent = toUTM(lat, lon);
+        document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
+        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
-    // Map click
-    map.on("click", e => updateCoords(e.latlng.lat, e.latlng.lng));
+        if (isGps) {
+          if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
+          else gpsMarker = L.marker([lat, lon]).addTo(map);
+          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
+        } else {
+          L.marker([lat, lon], { icon: new L.Icon.Default() }).addTo(enemyLayer);
+        }
+      }
 
-    // GPS locate
-    map.locate({ setView: true, maxZoom: 16 });
-    map.on("locationfound", e => {
-      updateCoords(e.latlng.lat, e.latlng.lng);
-      L.marker(e.latlng, { icon: friendlyIcon }).addTo(map).bindPopup("📍 My Location").openPopup();
+      function startTracking() {
+        watchId = navigator.geolocation.watchPosition(
+          pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+          err => { errorOutput.textContent = `Error: ${err.message}`; stopTracking(); },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+        );
+        isTracking = true;
+        getLocationBtn.textContent = "Stop Tracking";
+        statusOutput.textContent = "Tracking Active";
+      }
+
+      function stopTracking() {
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        watchId = null; isTracking = false; isFirstFix = true;
+        getLocationBtn.textContent = "Start Tracking Location"; statusOutput.textContent = "";
+      }
+
+      getLocationBtn.addEventListener('click', () => {
+        if (isTracking) { stopTracking(); } else { startTracking(); }
+      });
+
+      selectEnemyBtn.addEventListener('click', () => {
+        map.once('click', e => updateCoordinates(e.latlng.lat, e.latlng.lng, null, false));
+      });
+
+      clearEnemyBtn.addEventListener('click', () => {
+        enemyLayer.clearLayers();
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+      });
+
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = document.getElementById(btn.dataset.target);
+          navigator.clipboard.writeText(target.textContent);
+          btn.classList.add('copied'); setTimeout(()=>btn.classList.remove('copied'), 2000);
+        });
+      });
     });
   </script>
 </body>
