@@ -82,6 +82,7 @@
 
       let gpsMarker = null;
       const enemyLayer = L.layerGroup().addTo(map);
+      let enemyCounter = 0; // Counter for enemy markers
 
       // Define a custom red icon for enemy markers
       const redIcon = new L.Icon({
@@ -151,7 +152,11 @@
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map); // Use greenIcon for GPS markers
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else {
-          L.marker([lat, lon], { icon: redIcon }).addTo(enemyLayer); // Use redIcon for enemy markers
+          enemyCounter++; // Increment enemy marker counter
+          const marker = L.marker([lat, lon], { icon: redIcon })
+            .bindPopup(`Enemy ${enemyCounter}`)
+            .addTo(enemyLayer)
+            .openPopup(); // Add marker with numbered popup and open it
         }
       }
 
@@ -182,6 +187,7 @@
 
       clearEnemyBtn.addEventListener('click', () => {
         enemyLayer.clearLayers();
+        enemyCounter = 0; // Reset enemy counter
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
