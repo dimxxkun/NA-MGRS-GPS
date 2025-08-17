@@ -154,7 +154,7 @@
         } else {
           enemyCounter++; // Increment enemy marker counter
           const marker = L.marker([lat, lon], { icon: redIcon })
-            .bindPopup(`Enemy ${enemyCounter}`)
+            .bindPopup(`Enemy ${enemyCounter} (Imagery: ~2020–2025)`) // Updated popup with imagery date
             .addTo(enemyLayer)
             .openPopup(); // Add marker with numbered popup and open it
         }
