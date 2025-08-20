@@ -19,6 +19,10 @@
     button:disabled { background-color: #555; cursor: not-allowed; }
     #selectEnemyBtn, #clearEnemyBtn { background-color: #a00; }
     #selectEnemyBtn:hover, #clearEnemyBtn:hover { background-color: #c00; }
+    .dropdown { margin-bottom: 15px; }
+    .dropdown label { font-weight: bold; color: #d4d4d4; margin-right: 10px; }
+    .dropdown select { background-color: #4b704b; color: #fff; border: none; padding: 8px; font-size: 1em; border-radius: 6px; cursor: pointer; }
+    .dropdown select:focus { outline: 2px solid #d4d4d4; }
     .output { margin-top: 15px; }
     .output h3 { margin: 0 0 10px; color: #d4d4d4; }
     .coord-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
@@ -28,7 +32,11 @@
     .error, .status { font-weight: bold; margin-top: 10px; }
     .error { color: #ff4d4d; }
     .status { color: #d4d4d4; }
-    @media (max-width: 600px) { #map { height: 50vh; } button { padding: 8px 14px; font-size: 0.9em; } }
+    @media (max-width: 600px) { 
+      #map { height: 50vh; } 
+      button { padding: 8px 14px; font-size: 0.9em; } 
+      .dropdown select { width: 100%; padding: 6px; font-size: 0.9em; }
+    }
   </style>
 </head>
 <body>
@@ -42,6 +50,12 @@
         <button id="clearEnemyBtn" aria-label="Clear enemy markers">Clear Enemy Markers</button>
         <button id="centerBtn" aria-label="Center map on current location">Center on Me</button>
         <button id="exportBtnIn" aria-label="Export enemy coordinates">Export Coordinates</button>
+      </div>
+      <div class="dropdown">
+        <label for="enemySelect">Select Enemy Marker:</label>
+        <select id="enemySelect" aria-label="Select enemy marker">
+          <option value="">Select an enemy...</option>
+        </select>
       </div>
       <div class="output">
         <h3>Coordinates</h3>
@@ -105,6 +119,7 @@
       let gpsMarker = null;
       const enemyLayer = L.layerGroup().addTo(map);
       let enemyCounter = 0;
+      let enemyMarkers = [];
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -129,43 +144,53 @@
       const clearEnemyBtn = document.getElementById('clearEnemyBtn');
       const centerBtn = document.getElementById('centerBtn');
       const exportBtnIn = document.getElementById('exportBtnIn');
+      const enemySelect = document.getElementById('enemySelect');
       const errorOutput = document.getElementById('errorOutput');
       const statusOutput = document.getElementById('statusOutput');
 
       let watchId = null, isTracking = false, isFirstFix = true;
 
-      // Check geolocation support
       if (!navigator.geolocation) {
         errorOutput.textContent = "Geolocation is not supported by this browser.";
         getLocationBtn.disabled = true;
       }
 
-      // Load saved enemy markers from localStorage
       function loadEnemyMarkers() {
         const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
+        enemyMarkers = [];
         markers.forEach(marker => {
           enemyCounter = Math.max(enemyCounter, marker.id);
-          L.marker([marker.lat, marker.lon], { icon: redIcon })
+          const leafletMarker = L.marker([marker.lat, marker.lon], { icon: redIcon })
             .bindPopup(`Enemy ${marker.id}`)
             .addTo(enemyLayer);
+          enemyMarkers.push({ id: marker.id, lat: marker.lat, lon: marker.lon, marker: leafletMarker });
+          updateEnemyDropdown();
         });
       }
 
-      // Save enemy marker to localStorage
-      function saveEnemyMarker(lat, lon) {
+      function saveEnemyMarker(lat, lon, id) {
         const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
-        markers.push({ lat, lon, id: enemyCounter });
+        markers.push({ lat, lon, id });
         localStorage.setItem('enemyMarkers', JSON.stringify(markers));
       }
 
-      // Export coordinates as CSV
+      function updateEnemyDropdown() {
+        enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
+        enemyMarkers.forEach(marker => {
+          const option = document.createElement('option');
+          option.value = marker.id;
+          option.textContent = `Enemy ${marker.id}`;
+          enemySelect.appendChild(option);
+        });
+      }
+
       function exportCoordinates() {
-        const data = enemyLayer.getLayers().map((marker, i) => {
-          const lat = marker.getLatLng().lat;
-          const lon = marker.getLatLng().lng;
+        const data = enemyMarkers.map((marker, i) => {
+          const lat = marker.lat;
+          const lon = marker.lon;
           let mgrs;
           try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
-          return { id: `Enemy ${i + 1}`, lat, lon, mgrs };
+          return { id: `Enemy ${marker.id}`, lat, lon, mgrs };
         });
         const csv = 'ID,Latitude,Longitude,MGRS\n' + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs}`).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
@@ -201,7 +226,7 @@
         }
       }
 
-      function updateCoordinates(lat, lon, accuracy = null, isGps = false) {
+      function updateCoordinates(lat, lon, accuracy = null, isGps = false, id = null) {
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
@@ -217,12 +242,18 @@
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else {
-          enemyCounter++;
-          const marker = L.marker([lat, lon], { icon: redIcon })
-            .bindPopup(`Enemy ${enemyCounter}`)
-            .addTo(enemyLayer)
-            .openPopup();
-          saveEnemyMarker(lat, lon); // Save to localStorage
+          if (!id) {
+            enemyCounter++;
+            id = enemyCounter;
+            const marker = L.marker([lat, lon], { icon: redIcon })
+              .bindPopup(`Enemy ${id}`)
+              .addTo(enemyLayer)
+              .openPopup();
+            enemyMarkers.push({ id, lat, lon, marker });
+            saveEnemyMarker(lat, lon, id);
+            updateEnemyDropdown();
+            enemySelect.value = id;
+          }
         }
       }
 
@@ -249,7 +280,6 @@
         }
       }
 
-      // Pause tracking when page is not visible
       document.addEventListener('visibilitychange', () => {
         if (document.hidden && isTracking) {
           stopTracking();
@@ -271,8 +301,10 @@
 
       clearEnemyBtn.addEventListener('click', () => {
         enemyLayer.clearLayers();
+        enemyMarkers = [];
         enemyCounter = 0;
-        localStorage.removeItem('enemyMarkers'); // Clear saved markers
+        localStorage.removeItem('enemyMarkers');
+        updateEnemyDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
@@ -290,7 +322,19 @@
         });
       });
 
-      // Load saved markers on page load
+      enemySelect.addEventListener('change', () => {
+        const selectedId = enemySelect.value;
+        if (selectedId) {
+          const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
+          if (selectedMarker) {
+            updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, false, selectedMarker.id);
+            map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+          }
+        } else {
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        }
+      });
+
       loadEnemyMarkers();
     });
   </script>
