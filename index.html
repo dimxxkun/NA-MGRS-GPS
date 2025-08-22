@@ -63,6 +63,7 @@
         <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput" aria-label="Copy DMS coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">📋 Copy</button></div>
+        <div class="coord-line"><strong>Altitude:</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy Altitude">📋 Copy</button></div>
         <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
         <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
         <p class="status" id="statusOutput"></p>
@@ -226,7 +227,7 @@
         }
       }
 
-      function updateCoordinates(lat, lon, accuracy = null, isGps = false, id = null) {
+      function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
@@ -234,6 +235,7 @@
         document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
         document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
+        document.getElementById('altitudeOutput').textContent = altitude !== null ? `${altitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
         document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
@@ -259,7 +261,14 @@
 
       function startTracking() {
         watchId = navigator.geolocation.watchPosition(
-          pos => updateCoordinates(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, true),
+          pos => updateCoordinates(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            pos.coords.accuracy,
+            pos.coords.altitude,
+            pos.coords.altitudeAccuracy,
+            true
+          ),
           err => {
             errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Error: ${err.message}`;
             stopTracking();
@@ -294,7 +303,7 @@
       selectEnemyBtn.addEventListener('click', () => {
         map.getContainer().style.cursor = 'crosshair';
         map.once('click', e => {
-          updateCoordinates(e.latlng.lat, e.latlng.lng, null, false);
+          updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false);
           map.getContainer().style.cursor = '';
         });
       });
@@ -305,7 +314,7 @@
         enemyCounter = 0;
         localStorage.removeItem('enemyMarkers');
         updateEnemyDropdown();
-        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
       centerBtn.addEventListener('click', () => {
@@ -327,11 +336,11 @@
         if (selectedId) {
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
-            updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, false, selectedMarker.id);
+            updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           }
         } else {
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         }
       });
 
