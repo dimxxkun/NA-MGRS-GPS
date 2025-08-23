@@ -63,7 +63,6 @@
         <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput" aria-label="Copy DMS coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">📋 Copy</button></div>
-        <!-- Modified: Added AGL and renamed Altitude to ASL for clarity -->
         <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">📋 Copy</button></div>
         <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">📋 Copy</button></div>
         <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
@@ -158,19 +157,30 @@
         getLocationBtn.disabled = true;
       }
 
-      // New: Simplified geoid height lookup for Nigeria (mock EGM96 data)
+      // Simplified geoid height lookup for Nigeria (approximate EGM96 data)
       function getGeoidHeight(lat, lon) {
-        // In Nigeria, geoid heights (EGM96) range ~10–40m. This is a mock function.
-        // Replace with actual EGM96 data (e.g., JSON lookup or API) for production.
-        // Example: Nigeria's geoid height is ~20–30m in most areas.
-        return 25; // Mock average geoid height in meters for Nigeria
+        // Nigeria's geoid height (EGM96) ranges ~20–40m
+        // Simplified lookup based on latitude regions in Nigeria
+        if (lat < 7) return 20; // Southern Nigeria
+        else if (lat < 10) return 25; // Central Nigeria (e.g., Abuja)
+        else return 30; // Northern Nigeria
+        // For production, use EGM96/2008 lookup table or API
       }
 
-      // New: Mock DEM for terrain elevation (replace with SRTM or API in production)
+      // Fetch terrain elevation from Open-Elevation API
       async function getTerrainElevation(lat, lon) {
-        // Mock function: assumes flat terrain at 300m for Nigeria (e.g., central plateau).
-        // In practice, use SRTM 30m data or a server-side API (e.g., Copernicus DEM).
-        return 300; // Mock elevation in meters
+        try {
+          const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
+          const data = await response.json();
+          if (data.results && data.results[0] && data.results[0].elevation) {
+            return data.results[0].elevation;
+          }
+          throw new Error("Invalid elevation data");
+        } catch (error) {
+          console.error('Elevation fetch failed:', error);
+          // Fallback mock value for Nigeria (central plateau ~400m)
+          return 400;
+        }
       }
 
       function loadEnemyMarkers() {
@@ -244,25 +254,30 @@
         }
       }
 
-      function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
+      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
-        // New: Apply geoid correction and calculate AGL
         let correctedAltitude = altitude;
         let agl = null;
-        if (altitude !== null && isGps) {
+        if (isGps && altitude !== null) {
           const geoidHeight = getGeoidHeight(lat, lon);
-          correctedAltitude = altitude - geoidHeight;
-          getTerrainElevation(lat, lon).then(elevation => {
+          if (geoidHeight !== null) {
+            correctedAltitude = altitude - geoidHeight;
+          } else {
+            correctedAltitude = null;
+            document.getElementById('errorOutput').textContent = "Geoid height unavailable.";
+          }
+          const elevation = await getTerrainElevation(lat, lon);
+          if (elevation !== null && correctedAltitude !== null) {
             agl = correctedAltitude - elevation;
-            document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
-          }).catch(() => {
-            document.getElementById('aglOutput').textContent = "N/A";
-            document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation.";
-          });
-        } else {
-          document.getElementById('aglOutput').textContent = "N/A";
+            if (agl < 0) {
+              agl = 0;
+              document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m.";
+            }
+          } else {
+            document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
+          }
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -270,6 +285,7 @@
         document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
         document.getElementById('altitudeOutput').textContent = correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
+        document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
         document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
@@ -295,14 +311,16 @@
 
       function startTracking() {
         watchId = navigator.geolocation.watchPosition(
-          pos => updateCoordinates(
-            pos.coords.latitude,
-            pos.coords.longitude,
-            pos.coords.accuracy,
-            pos.coords.altitude,
-            pos.coords.altitudeAccuracy,
-            true
-          ),
+          async pos => {
+            await updateCoordinates(
+              pos.coords.latitude,
+              pos.coords.longitude,
+              pos.coords.accuracy,
+              pos.coords.altitude,
+              pos.coords.altitudeAccuracy,
+              true
+            );
+          },
           err => {
             errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Error: ${err.message}`;
             stopTracking();
@@ -336,8 +354,8 @@
 
       selectEnemyBtn.addEventListener('click', () => {
         map.getContainer().style.cursor = 'crosshair';
-        map.once('click', e => {
-          updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false);
+        map.once('click', async e => {
+          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false);
           map.getContainer().style.cursor = '';
         });
       });
@@ -365,12 +383,12 @@
         });
       });
 
-      enemySelect.addEventListener('change', () => {
+      enemySelect.addEventListener('change', async () => {
         const selectedId = enemySelect.value;
         if (selectedId) {
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
-            updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
+            await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           }
         } else {
