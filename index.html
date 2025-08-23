@@ -570,7 +570,6 @@
         console.log('Current enemyMarkers:', enemyMarkers);
         console.log('Current user location:', currentUserLocation);
 
-        // Always rebuild the dropdown to ensure it updates
         enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
         enemyMarkers.forEach(marker => {
           let label = `Enemy ${marker.id}`;
@@ -684,38 +683,22 @@
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
           }
           shouldUpdateDropdown = true;
-        } else if (enemySelect.value && currentUserLocation) {
-          const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
-          if (selectedMarker) {
-            distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, selectedMarker.lat, selectedMarker.lon).toFixed(2) + ` ${distanceUnit}`;
-          }
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
         document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
         document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
-        document.getElementById('altitudeOutput').textContent = correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
-        document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
+        document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
+        document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : "N/A";
         document.getElementById('distanceOutput').textContent = distance;
-        document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
+        document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
         if (isGps) {
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
-          if (enemySelect.value && currentUserLocation) {
-            const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
-            if (selectedMarker) {
-              document.getElementById('distanceOutput').textContent = calculateDistance(
-                currentUserLocation.lat,
-                currentUserLocation.lon,
-                selectedMarker.lat,
-                selectedMarker.lon
-              ).toFixed(2) + ` ${distanceUnit}`;
-            }
-          }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
           enemyCounter = Math.max(enemyCounter, id);
           const marker = L.marker([lat, lon], { icon: redIcon })
@@ -875,10 +858,12 @@
         if (selectedId) {
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
+            // Update output with enemy coordinates only, not current GPS location
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           } else {
             console.error('Selected marker not found:', selectedId);
+            document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
           }
         } else {
           console.log('No enemy selected, clearing outputs');
