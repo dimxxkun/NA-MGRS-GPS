@@ -157,17 +157,21 @@
         getLocationBtn.disabled = true;
       }
 
-      // Simplified geoid height lookup for Nigeria (approximate EGM96 data)
+      // Geoid height lookup for Nigeria (approximate EGM96 data)
       function getGeoidHeight(lat, lon) {
         // Nigeria's geoid height (EGM96) ranges ~20–40m
-        // Simplified lookup based on latitude regions in Nigeria
-        if (lat < 7) return 20; // Southern Nigeria
-        else if (lat < 10) return 25; // Central Nigeria (e.g., Abuja)
-        else return 30; // Northern Nigeria
-        // For production, use EGM96/2008 lookup table or API
+        try {
+          if (lat < 7) return 20; // Southern Nigeria (e.g., Lagos)
+          else if (lat < 10) return 25; // Central Nigeria (e.g., Abuja)
+          else return 30; // Northern Nigeria (e.g., Kano)
+        } catch (error) {
+          console.error('Geoid height error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to compute geoid height.";
+          return null;
+        }
       }
 
-      // Fetch terrain elevation from Open-Elevation API
+      // Fetch terrain elevation from Open-Elevation API or fallback
       async function getTerrainElevation(lat, lon) {
         try {
           const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
@@ -178,8 +182,10 @@
           throw new Error("Invalid elevation data");
         } catch (error) {
           console.error('Elevation fetch failed:', error);
-          // Fallback mock value for Nigeria (central plateau ~400m)
-          return 400;
+          // Fallback based on latitude for Nigeria
+          if (lat < 7) return 100; // Southern Nigeria (coastal, low elevation)
+          else if (lat < 10) return 400; // Central Nigeria (plateau, e.g., Abuja)
+          else return 300; // Northern Nigeria (plains)
         }
       }
 
@@ -272,12 +278,15 @@
           if (elevation !== null && correctedAltitude !== null) {
             agl = correctedAltitude - elevation;
             if (agl < 0) {
+              console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
               agl = 0;
-              document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m.";
+              document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
             }
           } else {
             document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
           }
+          // Debug logging
+          console.log({ lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
