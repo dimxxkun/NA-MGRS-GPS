@@ -17,8 +17,8 @@
     button { background-color: #4b704b; color: #fff; border: none; padding: 10px 18px; cursor: pointer; font-size: 1em; border-radius: 6px; transition: background-color 0.3s; }
     button:hover, button:focus { background-color: #5a8a5a; outline: 2px solid #d4d4d4; }
     button:disabled { background-color: #555; cursor: not-allowed; }
-    #selectEnemyBtn, #clearEnemyBtn { background-color: #a00; }
-    #selectEnemyBtn:hover, #clearEnemyBtn:hover { background-color: #c00; }
+    #selectEnemyBtn, #clearEnemyBtn, #trackOtherDeviceBtn { background-color: #a00; }
+    #selectEnemyBtn:hover, #clearEnemyBtn:hover, #trackOtherDeviceBtn:hover { background-color: #c00; }
     .dropdown { margin-bottom: 15px; }
     .dropdown label { font-weight: bold; color: #d4d4d4; margin-right: 10px; }
     .dropdown select { background-color: #4b704b; color: #fff; border: none; padding: 8px; font-size: 1em; border-radius: 6px; cursor: pointer; }
@@ -46,6 +46,7 @@
     <div class="controls">
       <div class="button-group">
         <button id="getLocationBtn" aria-label="Toggle location tracking">Start Tracking Location</button>
+        <button id="trackOtherDeviceBtn" aria-label="Toggle tracking other device">Track Other Device</button>
         <button id="selectEnemyBtn" aria-label="Select enemy coordinates">Select Enemy Coordinates</button>
         <button id="clearEnemyBtn" aria-label="Clear enemy markers">Clear Enemy Markers</button>
         <button id="centerBtn" aria-label="Center map on current location">Center on Me</button>
@@ -112,13 +113,14 @@
         if (e.name === 'Terrain') {
           document.getElementById('statusOutput').textContent = 'Zoom in to see contour labels clearly';
         } else {
-          document.getElementById('statusOutput').textContent = isTracking ? 'Tracking Active' : '';
+          document.getElementById('statusOutput').textContent = isTracking || isTrackingOther ? 'Tracking Active' : '';
         }
       });
 
       L.control.scale({ position: 'bottomleft', metric: true, imperial: true }).addTo(map);
 
       let gpsMarker = null;
+      let otherDeviceMarker = null;
       const enemyLayer = L.layerGroup().addTo(map);
       let enemyCounter = 0;
       let enemyMarkers = [];
@@ -141,7 +143,17 @@
         shadowSize: [41, 41]
       });
 
+      const blueIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+
       const getLocationBtn = document.getElementById('getLocationBtn');
+      const trackOtherDeviceBtn = document.getElementById('trackOtherDeviceBtn');
       const selectEnemyBtn = document.getElementById('selectEnemyBtn');
       const clearEnemyBtn = document.getElementById('clearEnemyBtn');
       const centerBtn = document.getElementById('centerBtn');
@@ -151,6 +163,7 @@
       const statusOutput = document.getElementById('statusOutput');
 
       let watchId = null, isTracking = false, isFirstFix = true;
+      let otherDeviceInterval = null, isTrackingOther = false;
 
       if (!navigator.geolocation) {
         errorOutput.textContent = "Geolocation is not supported by this browser.";
@@ -159,10 +172,9 @@
 
       // Geoid height lookup for Nigeria (approximate EGM96 data)
       function getGeoidHeight(lat, lon) {
-        // Nigeria's geoid height (EGM96) ranges ~20–40m
         try {
           if (lat < 7) return 20; // Southern Nigeria (e.g., Lagos)
-          else if (lat < 10) return 25; // Central Nigeria (e.g., Abuja)
+          else if (lat < 10) return 24; // Central Nigeria (e.g., Abuja)
           else return 30; // Northern Nigeria (e.g., Kano)
         } catch (error) {
           console.error('Geoid height error:', error);
@@ -177,15 +189,41 @@
           const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
           const data = await response.json();
           if (data.results && data.results[0] && data.results[0].elevation) {
-            return data.results[0].elevation;
+            const elevation = data.results[0].elevation;
+            if (elevation < 0 || elevation > 1000) { // Validate elevation range for Nigeria
+              throw new Error("Unrealistic elevation data");
+            }
+            return elevation;
           }
           throw new Error("Invalid elevation data");
         } catch (error) {
           console.error('Elevation fetch failed:', error);
           // Fallback based on latitude for Nigeria
-          if (lat < 7) return 100; // Southern Nigeria (coastal, low elevation)
-          else if (lat < 10) return 400; // Central Nigeria (plateau, e.g., Abuja)
-          else return 300; // Northern Nigeria (plains)
+          if (lat < 7) return 30; // Southern Nigeria (coastal, very low elevation)
+          else if (lat < 10) return 300; // Central Nigeria (plateau, e.g., Abuja)
+          else return 200; // Northern Nigeria (plains)
+        }
+      }
+
+      // Mock function to fetch other device's coordinates (replace with real server/WebSocket)
+      async function fetchOtherDeviceCoordinates() {
+        try {
+          // Mock data: Replace with real server API call or WebSocket
+          const mockResponse = {
+            latitude: 9.0765 + (Math.random() - 0.5) * 0.01, // Near Abuja
+            longitude: 7.3986 + (Math.random() - 0.5) * 0.01,
+            altitude: 350 + Math.random() * 50, // Mock altitude
+            accuracy: 10,
+            altitudeAccuracy: 15
+          };
+          return mockResponse;
+          // Example real API call:
+          // const response = await fetch('https://your-server.com/api/location');
+          // return await response.json();
+        } catch (error) {
+          console.error('Failed to fetch other device coordinates:', error);
+          document.getElementById('errorOutput').textContent = "Failed to fetch other device location. IMEI tracking is not supported.";
+          return null;
         }
       }
 
@@ -260,33 +298,39 @@
         }
       }
 
-      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
+      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null, isOtherDevice = false) {
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
         let correctedAltitude = altitude;
         let agl = null;
         if (isGps && altitude !== null) {
-          const geoidHeight = getGeoidHeight(lat, lon);
-          if (geoidHeight !== null) {
-            correctedAltitude = altitude - geoidHeight;
-          } else {
+          if (altitudeAccuracy > 50 || altitude < 0) { // Validate GPS altitude
+            document.getElementById('errorOutput').textContent = "Invalid GPS altitude data. AGL not calculated.";
+            console.warn(`Invalid altitude: altitude=${altitude}, altitudeAccuracy=${altitudeAccuracy}`);
             correctedAltitude = null;
-            document.getElementById('errorOutput').textContent = "Geoid height unavailable.";
-          }
-          const elevation = await getTerrainElevation(lat, lon);
-          if (elevation !== null && correctedAltitude !== null) {
-            agl = correctedAltitude - elevation;
-            if (agl < 0) {
-              console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
-              agl = 0;
-              document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
-            }
+            agl = null;
           } else {
-            document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
+            const geoidHeight = getGeoidHeight(lat, lon);
+            if (geoidHeight !== null) {
+              correctedAltitude = altitude - geoidHeight;
+            } else {
+              correctedAltitude = null;
+              document.getElementById('errorOutput').textContent = "Geoid height unavailable.";
+            }
+            const elevation = await getTerrainElevation(lat, lon);
+            if (elevation !== null && correctedAltitude !== null) {
+              agl = correctedAltitude - elevation;
+              if (agl < 0) {
+                console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
+                agl = 0;
+                document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
+              }
+            } else {
+              document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
+            }
           }
-          // Debug logging
-          console.log({ lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
+          console.log({ lat, lon, altitude, altitudeAccuracy, geoidHeight, elevation, correctedAltitude, agl, source: isOtherDevice ? 'Other Device' : 'GPS' });
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -298,9 +342,13 @@
         document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
-        if (isGps) {
+        if (isGps && !isOtherDevice) {
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
-          else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
+          else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map).bindPopup('My Location');
+          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
+        } else if (isOtherDevice) {
+          if (otherDeviceMarker) otherDeviceMarker.setLatLng([lat, lon]);
+          else otherDeviceMarker = L.marker([lat, lon], { icon: blueIcon }).addTo(map).bindPopup('Other Device');
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else {
           if (!id) {
@@ -345,20 +393,64 @@
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null; isTracking = false; isFirstFix = true;
         getLocationBtn.textContent = "Start Tracking Location";
-        if (!map.hasLayer(esriTerrain)) {
+        if (!map.hasLayer(esriTerrain) && !isTrackingOther) {
           statusOutput.textContent = "";
         }
       }
 
+      function startTrackingOtherDevice() {
+        otherDeviceInterval = setInterval(async () => {
+          const data = await fetchOtherDeviceCoordinates();
+          if (data) {
+            await updateCoordinates(
+              data.latitude,
+              data.longitude,
+              data.accuracy,
+              data.altitude,
+              data.altitudeAccuracy,
+              true,
+              null,
+              true
+            );
+          }
+        }, 5000); // Poll every 5 seconds
+        isTrackingOther = true;
+        trackOtherDeviceBtn.textContent = "Stop Tracking Other Device";
+        statusOutput.textContent = "Tracking Other Device Active. Note: IMEI-based tracking is not supported.";
+      }
+
+      function stopTrackingOtherDevice() {
+        if (otherDeviceInterval) clearInterval(otherDeviceInterval);
+        otherDeviceInterval = null; isTrackingOther = false;
+        trackOtherDeviceBtn.textContent = "Track Other Device";
+        if (!map.hasLayer(esriTerrain) && !isTracking) {
+          statusOutput.textContent = "";
+        }
+        if (otherDeviceMarker) {
+          map.removeLayer(otherDeviceMarker);
+          otherDeviceMarker = null;
+        }
+      }
+
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden && isTracking) {
-          stopTracking();
-          statusOutput.textContent = "Tracking paused (page not visible)";
+        if (document.hidden) {
+          if (isTracking) {
+            stopTracking();
+            statusOutput.textContent = "Tracking paused (page not visible)";
+          }
+          if (isTrackingOther) {
+            stopTrackingOtherDevice();
+            statusOutput.textContent = "Other device tracking paused (page not visible)";
+          }
         }
       });
 
       getLocationBtn.addEventListener('click', () => {
         if (isTracking) { stopTracking(); } else { startTracking(); }
+      });
+
+      trackOtherDeviceBtn.addEventListener('click', () => {
+        if (isTrackingOther) { stopTrackingOtherDevice(); } else { startTrackingOtherDevice(); }
       });
 
       selectEnemyBtn.addEventListener('click', () => {
@@ -380,6 +472,7 @@
 
       centerBtn.addEventListener('click', () => {
         if (gpsMarker) map.flyTo(gpsMarker.getLatLng(), 15);
+        else if (otherDeviceMarker) map.flyTo(otherDeviceMarker.getLatLng(), 15);
       });
 
       exportBtnIn.addEventListener('click', exportCoordinates);
