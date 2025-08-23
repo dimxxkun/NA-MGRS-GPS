@@ -392,6 +392,7 @@
       let enemyCounter = 0;
       let enemyMarkers = [];
       let currentUserLocation = null; // Store last known user location
+      let lastDropdownUpdate = 0; // Timestamp for debouncing dropdown updates
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -488,10 +489,26 @@
         localStorage.setItem('enemyMarkers', JSON.stringify(markers));
       }
 
-      function updateEnemyDropdown(selectedId = null) {
-        // Clear existing options
+      // Debounced updateEnemyDropdown to prevent rapid updates
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+
+      const updateEnemyDropdown = debounce((selectedId = null) => {
+        const now = Date.now();
+        if (now - lastDropdownUpdate < 1000) return; // Skip if updated recently
+        lastDropdownUpdate = now;
+
+        const currentSelection = enemySelect.value || selectedId;
         enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
-        // Add unique enemy markers with distance if user location is available
         const uniqueIds = new Set(enemyMarkers.map(marker => marker.id));
         uniqueIds.forEach(id => {
           const marker = enemyMarkers.find(m => m.id === id);
@@ -509,11 +526,11 @@
               label += ` (${distance} km)`;
             }
             option.textContent = label;
-            option.selected = marker.id == selectedId;
+            option.selected = marker.id == currentSelection;
             enemySelect.appendChild(option);
           }
         });
-      }
+      }, 1000); // Debounce for 1 second
 
       function exportCoordinates() {
         const data = enemyMarkers.map((marker, i) => {
@@ -575,7 +592,6 @@
         let distance = "N/A";
         if (isGps) {
           currentUserLocation = { lat, lon }; // Update user location
-          updateEnemyDropdown(enemySelect.value); // Update dropdown with new distances
           const geoidHeight = getGeoidHeight(lat, lon);
           if (geoidHeight !== null) {
             correctedAltitude = altitude - geoidHeight;
@@ -595,6 +611,7 @@
             document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
           }
           console.log({ lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
+          updateEnemyDropdown(enemySelect.value); // Update dropdown with new distances
         } else if (id) {
           // Calculate distance for selected enemy if user location is available
           if (currentUserLocation) {
