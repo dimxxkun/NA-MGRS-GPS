@@ -27,8 +27,52 @@
     .output h3 { margin: 0 0 10px; color: #d4d4d4; }
     .coord-line { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
     .coord-line span { font-weight: bold; color: #e6e6e6; }
-    .copy-btn { background: #333; font-size: 0.8em; padding: 5px 8px; margin-left: 8px; }
-    .copy-btn.copied { background-color: #5a8a5a; }
+    .copy-btn {
+      background: linear-gradient(135deg, #4b704b, #3a5a3a);
+      color: #fff;
+      font-size: 0.9em;
+      padding: 6px 12px;
+      margin-left: 8px;
+      border-radius: 4px;
+      border: 1px solid #5a8a5a;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .copy-btn:hover {
+      background: linear-gradient(135deg, #5a8a5a, #4b704b);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .copy-btn.copied {
+      background: linear-gradient(135deg, #2e7d32, #1b5e20);
+    }
+    .copy-btn.copied::before {
+      content: '✓';
+      margin-right: 4px;
+    }
+    .copy-all-btn {
+      background: linear-gradient(135deg, #0288d1, #01579b);
+      color: #fff;
+      font-size: 0.9em;
+      padding: 10px 16px;
+      border-radius: 4px;
+      border: 1px solid #4fc3f7;
+      transition: all 0.3s ease;
+    }
+    .copy-all-btn:hover {
+      background: linear-gradient(135deg, #4fc3f7, #0288d1);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .copy-all-btn.copied {
+      background: linear-gradient(135deg, #2e7d32, #1b5e20);
+    }
+    .copy-all-btn.copied::before {
+      content: '✓';
+      margin-right: 4px;
+    }
     .error, .status { font-weight: bold; margin-top: 10px; }
     .error { color: #ff4d4d; }
     .status { color: #d4d4d4; }
@@ -59,14 +103,15 @@
       </div>
       <div class="output">
         <h3>Coordinates</h3>
-        <div class="coord-line"><strong>MGRS:</strong> <span id="mgrsOutput">N/A</span> <button class="copy-btn" data-target="mgrsOutput" aria-label="Copy MGRS coordinates">📋 Copy</button></div>
-        <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">📋 Copy</button></div>
-        <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput" aria-label="Copy DMS coordinates">📋 Copy</button></div>
-        <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">📋 Copy</button></div>
-        <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">📋 Copy</button></div>
-        <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">📋 Copy</button></div>
+        <div class="coord-line"><strong>MGRS:</strong> <span id="mgrsOutput">N/A</span> <button class="copy-btn" data-target="mgrsOutput" aria-label="Copy MGRS coordinates">Copy</button></div>
+        <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">Copy</button></div>
+        <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput" aria-label="Copy DMS coordinates">Copy</button></div>
+        <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">Copy</button></div>
+        <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">Copy</button></div>
+        <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">Copy</button></div>
         <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
         <div class="coord-line"><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></div>
+        <button class="copy-all-btn" id="copyAllBtn" aria-label="Copy all coordinates">Copy All Coordinates</button>
         <p class="status" id="statusOutput"></p>
         <p class="error" id="errorOutput"></p>
       </div>
@@ -159,7 +204,6 @@
 
       // Geoid height lookup for Nigeria (approximate EGM96 data)
       function getGeoidHeight(lat, lon) {
-        // Nigeria's geoid height (EGM96) ranges ~20–40m
         try {
           if (lat < 7) return 20; // Southern Nigeria (e.g., Lagos)
           else if (lat < 10) return 25; // Central Nigeria (e.g., Abuja)
@@ -182,7 +226,6 @@
           throw new Error("Invalid elevation data");
         } catch (error) {
           console.error('Elevation fetch failed:', error);
-          // Fallback based on latitude for Nigeria
           if (lat < 7) return 100; // Southern Nigeria (coastal, low elevation)
           else if (lat < 10) return 400; // Central Nigeria (plateau, e.g., Abuja)
           else return 300; // Northern Nigeria (plains)
@@ -285,7 +328,6 @@
           } else {
             document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
           }
-          // Debug logging
           console.log({ lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
         }
 
@@ -387,8 +429,36 @@
       document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const target = document.getElementById(btn.dataset.target);
-          navigator.clipboard.writeText(target.textContent);
-          btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 2000);
+          navigator.clipboard.writeText(target.textContent).then(() => {
+            btn.classList.add('copied');
+            btn.textContent = 'Copied';
+            setTimeout(() => {
+              btn.classList.remove('copied');
+              btn.textContent = 'Copy';
+            }, 2000);
+          });
+        });
+      });
+
+      document.getElementById('copyAllBtn').addEventListener('click', () => {
+        const outputs = [
+          `MGRS: ${document.getElementById('mgrsOutput').textContent}`,
+          `Lat/Long: ${document.getElementById('latLonOutput').textContent}`,
+          `DMS: ${document.getElementById('dmsOutput').textContent}`,
+          `UTM: ${document.getElementById('utmOutput').textContent}`,
+          `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
+          `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
+          `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
+          `Last Updated: ${document.getElementById('timestampOutput').textContent}`
+        ].join('\n');
+        navigator.clipboard.writeText(outputs).then(() => {
+          const btn = document.getElementById('copyAllBtn');
+          btn.classList.add('copied');
+          btn.textContent = 'Copied All';
+          setTimeout(() => {
+            btn.classList.remove('copied');
+            btn.textContent = 'Copy All Coordinates';
+          }, 2000);
         });
       });
 
