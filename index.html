@@ -342,6 +342,7 @@
   <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM loaded, initializing map and controls');
       const map = L.map('map').setView([9.0765, 7.3986], 8);
 
       // Basemaps
@@ -368,6 +369,7 @@
         geocoder: L.Control.Geocoder.nominatim(),
         position: 'topright'
       }).on('markgeocode', function(e) {
+        console.log('Search result selected:', e.geocode.center);
         const latlng = e.geocode.center;
         map.flyTo(latlng, 12);
         updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
@@ -402,6 +404,7 @@
       let lastUserLocation = null;
       let isDropdownOpen = false;
       let distanceUnit = 'km'; // Default to kilometers
+      let lastDropdownUpdate = 0;
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -438,13 +441,23 @@
         getLocationBtn.disabled = true;
       }
 
-      // Detect dropdown open/close state
-      enemySelect.addEventListener('mousedown', () => { isDropdownOpen = true; });
-      enemySelect.addEventListener('change', () => { isDropdownOpen = false; });
-      enemySelect.addEventListener('blur', () => { isDropdownOpen = false; });
+      // Dropdown event listeners with debugging
+      enemySelect.addEventListener('mousedown', () => {
+        console.log('Dropdown mousedown, setting isDropdownOpen = true');
+        isDropdownOpen = true;
+      });
+      enemySelect.addEventListener('change', () => {
+        console.log('Dropdown changed, selected value:', enemySelect.value);
+        isDropdownOpen = false;
+      });
+      enemySelect.addEventListener('blur', () => {
+        console.log('Dropdown blur, setting isDropdownOpen = false');
+        isDropdownOpen = false;
+      });
 
-      // Calculate distance using Haversine formula (returns distance in selected unit)
+      // Calculate distance using Haversine formula
       function calculateDistance(lat1, lon1, lat2, lon2) {
+        console.log('Calculating distance:', { lat1, lon1, lat2, lon2, distanceUnit });
         const R = 6371; // Earth's radius in kilometers
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -456,6 +469,7 @@
         if (distanceUnit === 'mi') {
           distance *= 0.621371; // Convert to miles
         }
+        console.log('Distance calculated:', distance.toFixed(2), distanceUnit);
         return distance;
       }
 
@@ -463,7 +477,8 @@
       function hasLocationChanged(newLat, newLon, oldLat, oldLon) {
         if (!oldLat || !oldLon) return true;
         const distance = calculateDistance(newLat, newLon, oldLat, oldLon) * (distanceUnit === 'km' ? 1000 : 1609.34); // Convert to meters
-        return distance > 10; // Update if moved more than 10 meters
+        console.log('Location change check:', { newLat, newLon, oldLat, oldLon, distance, significant: distance > 10 });
+        return distance > 10;
       }
 
       // Geoid height lookup for Nigeria (approximate EGM96 data)
@@ -497,19 +512,30 @@
       }
 
       function loadEnemyMarkers() {
-        const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
-        enemyMarkers = [];
-        markers.forEach(marker => {
-          enemyCounter = Math.max(enemyCounter, marker.id);
-          const leafletMarker = L.marker([marker.lat, marker.lon], { icon: redIcon })
-            .bindPopup(`Enemy ${marker.id}`)
-            .addTo(enemyLayer);
-          enemyMarkers.push({ id: marker.id, lat: marker.lat, lon: marker.lon, marker: leafletMarker });
-        });
-        updateEnemyDropdown();
+        console.log('Loading enemy markers from localStorage');
+        try {
+          const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
+          console.log('Loaded markers:', markers);
+          enemyMarkers = [];
+          markers.forEach(marker => {
+            if (marker.id && marker.lat && marker.lon) {
+              enemyCounter = Math.max(enemyCounter, marker.id);
+              const leafletMarker = L.marker([marker.lat, marker.lon], { icon: redIcon })
+                .bindPopup(`Enemy ${marker.id}`)
+                .addTo(enemyLayer);
+              enemyMarkers.push({ id: marker.id, lat: marker.lat, lon: marker.lon, marker: leafletMarker });
+            }
+          });
+          console.log('Enemy markers after loading:', enemyMarkers);
+          updateEnemyDropdown();
+        } catch (error) {
+          console.error('Error loading enemy markers:', error);
+          document.getElementById('errorOutput').textContent = "Failed to load enemy markers.";
+        }
       }
 
       function saveEnemyMarker(lat, lon, id) {
+        console.log('Saving enemy marker:', { lat, lon, id });
         const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
         markers.push({ lat, lon, id });
         localStorage.setItem('enemyMarkers', JSON.stringify(markers));
@@ -529,46 +555,45 @@
       }
 
       const updateEnemyDropdown = debounce((selectedId = null) => {
-        if (isDropdownOpen) return; // Skip update if dropdown is open
+        console.log('Updating dropdown, selectedId:', selectedId, 'isDropdownOpen:', isDropdownOpen);
+        if (isDropdownOpen) {
+          console.log('Dropdown open, skipping update');
+          return;
+        }
         const now = Date.now();
-        if (now - lastDropdownUpdate < 2000) return; // Skip if updated recently
+        if (now - lastDropdownUpdate < 2000) {
+          console.log('Too soon since last update:', now - lastDropdownUpdate);
+          return;
+        }
         lastDropdownUpdate = now;
 
-        const currentSelection = enemySelect.value || selectedId;
-        const currentOptions = Array.from(enemySelect.options).map(opt => ({ value: opt.value, text: opt.textContent }));
-        const newOptions = [];
-        const uniqueIds = new Set(enemyMarkers.map(marker => marker.id));
-        uniqueIds.forEach(id => {
-          const marker = enemyMarkers.find(m => m.id === id);
-          if (marker) {
-            let label = `Enemy ${marker.id}`;
-            if (currentUserLocation) {
-              const distance = calculateDistance(
-                currentUserLocation.lat,
-                currentUserLocation.lon,
-                marker.lat,
-                marker.lon
-              ).toFixed(2);
-              label += ` (${distance} ${distanceUnit})`;
-            }
-            newOptions.push({ value: marker.id, text: label, selected: marker.id == currentSelection });
-          }
-        });
+        console.log('Current enemyMarkers:', enemyMarkers);
+        console.log('Current user location:', currentUserLocation);
 
-        // Only update DOM if options have changed
-        if (JSON.stringify(currentOptions) !== JSON.stringify(newOptions.map(opt => ({ value: opt.value, text: opt.text })))) {
-          enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
-          newOptions.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt.value;
-            option.textContent = opt.text;
-            option.selected = opt.selected;
-            enemySelect.appendChild(option);
-          });
-        }
-      }, 2000); // Debounce for 2 seconds
+        // Always rebuild the dropdown to ensure it updates
+        enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
+        enemyMarkers.forEach(marker => {
+          let label = `Enemy ${marker.id}`;
+          if (currentUserLocation) {
+            const distance = calculateDistance(
+              currentUserLocation.lat,
+              currentUserLocation.lon,
+              marker.lat,
+              marker.lon
+            ).toFixed(2);
+            label += ` (${distance} ${distanceUnit})`;
+          }
+          const option = document.createElement('option');
+          option.value = marker.id;
+          option.textContent = label;
+          option.selected = marker.id == selectedId;
+          enemySelect.appendChild(option);
+        });
+        console.log('Dropdown updated, options:', enemySelect.options.length);
+      }, 2000);
 
       function exportCoordinates() {
+        console.log('Exporting coordinates, enemyMarkers:', enemyMarkers);
         const data = enemyMarkers.map((marker, i) => {
           const lat = marker.lat;
           const lon = marker.lon;
@@ -620,6 +645,7 @@
       }
 
       async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
+        console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, id });
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
@@ -629,7 +655,6 @@
         let shouldUpdateDropdown = false;
 
         if (isGps) {
-          // Only update if location has changed significantly
           if (!lastUserLocation || hasLocationChanged(lat, lon, lastUserLocation.lat, lastUserLocation.lon)) {
             currentUserLocation = { lat, lon };
             lastUserLocation = { lat, lon };
@@ -652,16 +677,14 @@
             } else {
               document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
             }
-            console.log({ lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
+            console.log('GPS update:', { lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
           }
         } else if (id) {
-          // Calculate distance for selected enemy if user location is available
           if (currentUserLocation) {
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
           }
           shouldUpdateDropdown = true;
         } else if (enemySelect.value && currentUserLocation) {
-          // If no id but an enemy is selected, update distance for the selected enemy
           const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
           if (selectedMarker) {
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, selectedMarker.lat, selectedMarker.lon).toFixed(2) + ` ${distanceUnit}`;
@@ -682,7 +705,6 @@
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
-          // Update distance for selected enemy if any
           if (enemySelect.value && currentUserLocation) {
             const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
             if (selectedMarker) {
@@ -706,11 +728,13 @@
         }
 
         if (shouldUpdateDropdown) {
+          console.log('Triggering dropdown update with selectedId:', id || enemySelect.value);
           updateEnemyDropdown(id || enemySelect.value);
         }
       }
 
       function startTracking() {
+        console.log('Starting GPS tracking');
         watchId = navigator.geolocation.watchPosition(
           async pos => {
             await updateCoordinates(
@@ -723,6 +747,7 @@
             );
           },
           err => {
+            console.error('Geolocation error:', err);
             errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Error: ${err.message}`;
             stopTracking();
           },
@@ -734,6 +759,7 @@
       }
 
       function stopTracking() {
+        console.log('Stopping GPS tracking');
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null;
         isTracking = false;
@@ -742,29 +768,33 @@
         if (!map.hasLayer(esriTerrain)) {
           statusOutput.textContent = "";
         }
-        // Do not clear currentUserLocation to persist distances
       }
 
       document.addEventListener('visibilitychange', () => {
         if (document.hidden && isTracking) {
+          console.log('Page hidden, pausing tracking');
           stopTracking();
           statusOutput.textContent = "Tracking paused (page not visible)";
         }
       });
 
       getLocationBtn.addEventListener('click', () => {
+        console.log('Location button clicked, isTracking:', isTracking);
         if (isTracking) { stopTracking(); } else { startTracking(); }
       });
 
       selectEnemyBtn.addEventListener('click', () => {
+        console.log('Select Enemy button clicked');
         map.getContainer().style.cursor = 'crosshair';
         map.once('click', async e => {
+          console.log('Map clicked for enemy marker:', e.latlng);
           await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, enemyCounter + 1);
           map.getContainer().style.cursor = '';
         });
       });
 
       clearEnemyBtn.addEventListener('click', () => {
+        console.log('Clear Enemy Markers button clicked');
         enemyLayer.clearLayers();
         enemyMarkers = [];
         enemyCounter = 0;
@@ -776,12 +806,14 @@
       });
 
       centerBtn.addEventListener('click', () => {
+        console.log('Center button clicked');
         if (gpsMarker) map.flyTo(gpsMarker.getLatLng(), 15);
       });
 
       exportBtnIn.addEventListener('click', exportCoordinates);
 
       toggleUnitsBtn.addEventListener('click', () => {
+        console.log('Toggle Units button clicked, current unit:', distanceUnit);
         distanceUnit = distanceUnit === 'km' ? 'mi' : 'km';
         toggleUnitsBtn.textContent = `Toggle Units (${distanceUnit === 'km' ? 'mi' : 'km'})`;
         updateEnemyDropdown(enemySelect.value);
@@ -800,6 +832,7 @@
 
       document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+          console.log('Copy button clicked for:', btn.dataset.target);
           const target = document.getElementById(btn.dataset.target);
           navigator.clipboard.writeText(target.textContent).then(() => {
             btn.classList.add('copied');
@@ -813,6 +846,7 @@
       });
 
       document.getElementById('copyAllBtn').addEventListener('click', () => {
+        console.log('Copy All button clicked');
         const outputs = [
           `MGRS: ${document.getElementById('mgrsOutput').textContent}`,
           `Lat/Long: ${document.getElementById('latLonOutput').textContent}`,
@@ -836,18 +870,23 @@
       });
 
       enemySelect.addEventListener('change', async () => {
+        console.log('Enemy select changed, value:', enemySelect.value);
         const selectedId = enemySelect.value;
         if (selectedId) {
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+          } else {
+            console.error('Selected marker not found:', selectedId);
           }
         } else {
+          console.log('No enemy selected, clearing outputs');
           ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         }
       });
 
+      console.log('Initializing enemy markers');
       loadEnemyMarkers();
     });
   </script>
