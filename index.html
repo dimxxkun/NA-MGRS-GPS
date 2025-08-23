@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nigerian Army GPS Coordinate System</title>
+  <title>PF - GEOTRACE</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -343,15 +343,26 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('DOM loaded, initializing map and controls');
-      const map = L.map('map').setView([9.0765, 7.3986], 8);
+      let map;
+      try {
+        map = L.map('map').setView([9.0765, 7.3986], 8);
+      } catch (error) {
+        console.error('Map initialization failed:', error);
+        document.getElementById('errorOutput').textContent = "Failed to initialize map. Check console for details.";
+        return;
+      }
 
       // Basemaps
       const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
-      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
+      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri'
+      }).addTo(map);
       const esriTerrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenTopoMap (CC-BY-SA)'
       });
-      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
+      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri'
+      });
 
       const layerControl = L.control.layers(
         {
@@ -363,27 +374,32 @@
       ).addTo(map);
 
       // Add Search Control
-      L.Control.geocoder({
-        defaultMarkGeocode: false,
-        placeholder: 'Search for a location...',
-        geocoder: L.Control.Geocoder.nominatim(),
-        position: 'topright'
-      }).on('markgeocode', function(e) {
-        console.log('Search result selected:', e.geocode.center);
-        const latlng = e.geocode.center;
-        map.flyTo(latlng, 12);
-        updateCoordinates(latlng.lat, latlng lng, null, null, null, false, null);
-      }).addTo(map);
+      try {
+        L.Control.geocoder({
+          defaultMarkGeocode: false,
+          placeholder: 'Search for a location...',
+          geocoder: L.Control.Geocoder.nominatim(),
+          position: 'topright'
+        }).on('markgeocode', function(e) {
+          console.log('Search result selected:', e.geocode.center);
+          const latlng = e.geocode.center;
+          map.flyTo(latlng, 12);
+          updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
+        }).addTo(map);
+      } catch (error) {
+        console.error('Geocoder initialization failed:', error);
+        document.getElementById('errorOutput').textContent = "Failed to initialize search control.";
+      }
 
       // Handle tile loading errors
       esriSatellite.on('tileerror', () => {
-        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
+        document.getElementById('errorOutput').textContent = "Failed to load satellite map tiles. Check your internet connection.";
       });
       osmLayer.on('tileerror', () => {
-        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
+        document.getElementById('errorOutput').textContent = "Failed to load OpenStreetMap tiles. Check your internet connection.";
       });
       esriTerrain.on('tileerror', () => {
-        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
+        document.getElementById('errorOutput').textContent = "Failed to load terrain map tiles. Check your internet connection.";
       });
 
       map.on('baselayerchange', (e) => {
@@ -661,7 +677,8 @@
           const utmProj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
           const [x, y] = proj4(utmProj, [lon, lat]);
           return `Zone ${zone}N: ${x.toFixed(2)}mE, ${y.toFixed(2)}mN`;
-        } catch {
+        } catch (error) {
+          console.error('UTM conversion failed:', error);
           return "N/A";
         }
       }
@@ -716,16 +733,21 @@
           shouldUpdateDropdown = true;
         }
 
-        document.getElementById('mgrsOutput').textContent = mgrs;
-        document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-        document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
-        document.getElementById('utmOutput').textContent = toUTM(lat, lon);
-        document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
-        document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : (lastAgl !== null ? `${lastAgl.toFixed(1)}m` : "N/A");
-        console.log('aglOutput set to:', document.getElementById('aglOutput').textContent);
-        document.getElementById('distanceOutput').textContent = distance;
-        document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
-        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+        try {
+          document.getElementById('mgrsOutput').textContent = mgrs;
+          document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+          document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
+          document.getElementById('utmOutput').textContent = toUTM(lat, lon);
+          document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
+          document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : (lastAgl !== null ? `${lastAgl.toFixed(1)}m` : "N/A");
+          console.log('aglOutput set to:', document.getElementById('aglOutput').textContent);
+          document.getElementById('distanceOutput').textContent = distance;
+          document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
+          document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+        } catch (error) {
+          console.error('Error updating coordinates display:', error);
+          document.getElementById('errorOutput').textContent = "Failed to update coordinates display.";
+        }
 
         if (shouldUpdateDropdown) {
           console.log('Triggering dropdown update with selectedId:', id || enemySelect.value);
@@ -735,38 +757,48 @@
 
       function startTracking() {
         console.log('Starting GPS tracking');
-        watchId = navigator.geolocation.watchPosition(
-          async pos => {
-            await updateCoordinates(
-              pos.coords.latitude,
-              pos.coords.longitude,
-              pos.coords.accuracy,
-              pos.coords.altitude,
-              pos.coords.altitudeAccuracy,
-              true
-            );
-          },
-          err => {
-            console.error('Geolocation error:', err);
-            errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Error: ${err.message}`;
-            stopTracking();
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-        );
-        isTracking = true;
-        getLocationBtn.textContent = "Stop Tracking";
-        statusOutput.textContent = "Tracking Active";
+        try {
+          watchId = navigator.geolocation.watchPosition(
+            async pos => {
+              await updateCoordinates(
+                pos.coords.latitude,
+                pos.coords.longitude,
+                pos.coords.accuracy,
+                pos.coords.altitude,
+                pos.coords.altitudeAccuracy,
+                true
+              );
+            },
+            err => {
+              console.error('Geolocation error:', err);
+              errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Error: ${err.message}`;
+              stopTracking();
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+          );
+          isTracking = true;
+          getLocationBtn.textContent = "Stop Tracking";
+          statusOutput.textContent = "Tracking Active";
+        } catch (error) {
+          console.error('Error starting GPS tracking:', error);
+          document.getElementById('errorOutput').textContent = "Failed to start GPS tracking.";
+        }
       }
 
       function stopTracking() {
         console.log('Stopping GPS tracking');
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        isTracking = false;
-        isFirstFix = true;
-        getLocationBtn.textContent = "Start Tracking Location";
-        if (!map.hasLayer(esriTerrain)) {
-          statusOutput.textContent = "";
+        try {
+          if (watchId) navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+          isTracking = false;
+          isFirstFix = true;
+          getLocationBtn.textContent = "Start Tracking Location";
+          if (!map.hasLayer(esriTerrain)) {
+            statusOutput.textContent = "";
+          }
+        } catch (error) {
+          console.error('Error stopping GPS tracking:', error);
+          document.getElementById('errorOutput').textContent = "Failed to stop GPS tracking.";
         }
       }
 
@@ -785,106 +817,141 @@
 
       selectEnemyBtn.addEventListener('click', () => {
         console.log('Select Enemy button clicked');
-        map.getContainer().style.cursor = 'crosshair';
-        map.once('click', async e => {
-          console.log('Map clicked for enemy marker:', e.latlng);
-          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, enemyCounter + 1);
-          map.getContainer().style.cursor = '';
-        });
+        try {
+          map.getContainer().style.cursor = 'crosshair';
+          map.once('click', async e => {
+            console.log('Map clicked for enemy marker:', e.latlng);
+            await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, enemyCounter + 1);
+            map.getContainer().style.cursor = '';
+          });
+        } catch (error) {
+          console.error('Error setting enemy marker:', error);
+          document.getElementById('errorOutput').textContent = "Failed to set enemy marker.";
+        }
       });
 
       clearEnemyBtn.addEventListener('click', () => {
         console.log('Clear Enemy Markers button clicked');
-        enemyLayer.clearLayers();
-        enemyMarkers = [];
-        enemyCounter = 0;
-        localStorage.removeItem('enemyMarkers');
-        currentUserLocation = null;
-        lastUserLocation = null;
-        lastAgl = null; // Reset lastAgl when clearing markers
-        updateEnemyDropdown();
-        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        try {
+          enemyLayer.clearLayers();
+          enemyMarkers = [];
+          enemyCounter = 0;
+          localStorage.removeItem('enemyMarkers');
+          currentUserLocation = null;
+          lastUserLocation = null;
+          lastAgl = null; // Reset lastAgl when clearing markers
+          updateEnemyDropdown();
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        } catch (error) {
+          console.error('Error clearing enemy markers:', error);
+          document.getElementById('errorOutput').textContent = "Failed to clear enemy markers.";
+        }
       });
 
       centerBtn.addEventListener('click', () => {
         console.log('Center button clicked');
-        if (gpsMarker) map.flyTo(gpsMarker.getLatLng(), 15);
+        try {
+          if (gpsMarker) map.flyTo(gpsMarker.getLatLng(), 15);
+        } catch (error) {
+          console.error('Error centering map:', error);
+          document.getElementById('errorOutput').textContent = "Failed to center map on current location.";
+        }
       });
 
       exportBtnIn.addEventListener('click', exportCoordinates);
 
       toggleUnitsBtn.addEventListener('click', () => {
         console.log('Toggle Units button clicked, current unit:', distanceUnit);
-        distanceUnit = distanceUnit === 'km' ? 'mi' : 'km';
-        toggleUnitsBtn.textContent = `Toggle Units (${distanceUnit === 'km' ? 'mi' : 'km'})`;
-        updateEnemyDropdown(enemySelect.value);
-        if (enemySelect.value && currentUserLocation) {
-          const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
-          if (selectedMarker) {
-            document.getElementById('distanceOutput').textContent = calculateDistance(
-              currentUserLocation.lat,
-              currentUserLocation.lon,
-              selectedMarker.lat,
-              selectedMarker.lon
-            ).toFixed(2) + ` ${distanceUnit}`;
+        try {
+          distanceUnit = distanceUnit === 'km' ? 'mi' : 'km';
+          toggleUnitsBtn.textContent = `Toggle Units (${distanceUnit === 'km' ? 'mi' : 'km'})`;
+          updateEnemyDropdown(enemySelect.value);
+          if (enemySelect.value && currentUserLocation) {
+            const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
+            if (selectedMarker) {
+              document.getElementById('distanceOutput').textContent = calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                selectedMarker.lat,
+                selectedMarker.lon
+              ).toFixed(2) + ` ${distanceUnit}`;
+            }
           }
+        } catch (error) {
+          console.error('Error toggling units:', error);
+          document.getElementById('errorOutput').textContent = "Failed to toggle distance units.";
         }
       });
 
       document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           console.log('Copy button clicked for:', btn.dataset.target);
-          const target = document.getElementById(btn.dataset.target);
-          navigator.clipboard.writeText(target.textContent).then(() => {
-            btn.classList.add('copied');
-            btn.textContent = 'Copied';
-            setTimeout(() => {
-              btn.classList.remove('copied');
-              btn.textContent = 'Copy';
-            }, 2000);
-          });
+          try {
+            const target = document.getElementById(btn.dataset.target);
+            navigator.clipboard.writeText(target.textContent).then(() => {
+              btn.classList.add('copied');
+              btn.textContent = 'Copied';
+              setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.textContent = 'Copy';
+              }, 2000);
+            });
+          } catch (error) {
+            console.error('Error copying text:', error);
+            document.getElementById('errorOutput').textContent = "Failed to copy coordinates.";
+          }
         });
       });
 
       document.getElementById('copyAllBtn').addEventListener('click', () => {
         console.log('Copy All button clicked');
-        const outputs = [
-          `MGRS: ${document.getElementById('mgrsOutput').textContent}`,
-          `Lat/Long: ${document.getElementById('latLonOutput').textContent}`,
-          `DMS: ${document.getElementById('dmsOutput').textContent}`,
-          `UTM: ${document.getElementById('utmOutput').textContent}`,
-          `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
-          `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
-          `Distance: ${document.getElementById('distanceOutput').textContent}`,
-          `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
-          `Last Updated: ${document.getElementById('timestampOutput').textContent}`
-        ].join('\n');
-        navigator.clipboard.writeText(outputs).then(() => {
-          const btn = document.getElementById('copyAllBtn');
-          btn.classList.add('copied');
-          btn.textContent = 'Copied All';
-          setTimeout(() => {
-            btn.classList.remove('copied');
-            btn.textContent = 'Copy All Coordinates';
-          }, 2000);
-        });
+        try {
+          const outputs = [
+            `MGRS: ${document.getElementById('mgrsOutput').textContent}`,
+            `Lat/Long: ${document.getElementById('latLonOutput').textContent}`,
+            `DMS: ${document.getElementById('dmsOutput').textContent}`,
+            `UTM: ${document.getElementById('utmOutput').textContent}`,
+            `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
+            `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
+            `Distance: ${document.getElementById('distanceOutput').textContent}`,
+            `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
+            `Last Updated: ${document.getElementById('timestampOutput').textContent}`
+          ].join('\n');
+          navigator.clipboard.writeText(outputs).then(() => {
+            const btn = document.getElementById('copyAllBtn');
+            btn.classList.add('copied');
+            btn.textContent = 'Copied All';
+            setTimeout(() => {
+              btn.classList.remove('copied');
+              btn.textContent = 'Copy All Coordinates';
+            }, 2000);
+          });
+        } catch (error) {
+          console.error('Error copying all coordinates:', error);
+          document.getElementById('errorOutput').textContent = "Failed to copy all coordinates.";
+        }
       });
 
       enemySelect.addEventListener('change', async () => {
         console.log('Enemy select changed, value:', enemySelect.value);
-        const selectedId = enemySelect.value;
-        if (selectedId) {
-          const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
-          if (selectedMarker) {
-            await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
-            map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+        try {
+          const selectedId = enemySelect.value;
+          if (selectedId) {
+            const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
+            if (selectedMarker) {
+              await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
+              map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+            } else {
+              console.error('Selected marker not found:', selectedId);
+              document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
+            }
           } else {
-            console.error('Selected marker not found:', selectedId);
-            document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
+            console.log('No enemy selected, clearing outputs');
+            ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
           }
-        } else {
-          console.log('No enemy selected, clearing outputs');
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        } catch (error) {
+          console.error('Error handling enemy select change:', error);
+          document.getElementById('errorOutput').textContent = "Failed to update enemy marker selection.";
         }
       });
 
