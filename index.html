@@ -355,7 +355,6 @@
       ).addTo(map);
 
       // Add Search Control
-      let searchMarker = null;
       L.Control.geocoder({
         defaultMarkGeocode: false,
         placeholder: 'Search for a location...',
@@ -364,16 +363,7 @@
       }).on('markgeocode', function(e) {
         const latlng = e.geocode.center;
         map.flyTo(latlng, 12);
-        // Remove previous search marker if it exists
-        if (searchMarker) {
-          map.removeLayer(searchMarker);
-        }
-        // Add new temporary search marker
-        searchMarker = L.marker(latlng, { icon: greenIcon })
-          .addTo(map)
-          .bindPopup(e.geocode.name)
-          .openPopup();
-        // Update coordinates without tagging as enemy
+        // Update coordinates without adding any marker
         updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
       }).addTo(map);
 
@@ -650,11 +640,6 @@
         enemyCounter = 0;
         localStorage.removeItem('enemyMarkers');
         updateEnemyDropdown();
-        // Clear temporary search marker
-        if (searchMarker) {
-          map.removeLayer(searchMarker);
-          searchMarker = null;
-        }
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
