@@ -372,7 +372,7 @@
         console.log('Search result selected:', e.geocode.center);
         const latlng = e.geocode.center;
         map.flyTo(latlng, 12);
-        updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
+        updateCoordinates(latlng.lat, latlng lng, null, null, null, false, null);
       }).addTo(map);
 
       // Handle tile loading errors
@@ -405,6 +405,8 @@
       let isDropdownOpen = false;
       let distanceUnit = 'km'; // Default to kilometers
       let lastDropdownUpdate = 0;
+      let lastAgl = null; // Store last valid AGL value
+      const elevationCache = new Map(); // Cache for elevation data
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -484,9 +486,10 @@
       // Geoid height lookup for Nigeria (approximate EGM96 data)
       function getGeoidHeight(lat, lon) {
         try {
-          if (lat < 7) return 20;
-          else if (lat < 10) return 25;
-          else return 30;
+          if (lat < 6) return 18; // Southern Nigeria
+          else if (lat < 8) return 22; // Central Nigeria
+          else if (lat < 10) return 25; // North-Central Nigeria
+          else return 28; // Northern Nigeria
         } catch (error) {
           console.error('Geoid height error:', error);
           document.getElementById('errorOutput').textContent = "Failed to compute geoid height.";
@@ -496,18 +499,38 @@
 
       // Fetch terrain elevation from Open-Elevation API or fallback
       async function getTerrainElevation(lat, lon) {
-        try {
-          const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
-          const data = await response.json();
-          if (data.results && data.results[0] && data.results[0].elevation) {
-            return data.results[0].elevation;
+        const cacheKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+        if (elevationCache.has(cacheKey)) {
+          console.log('Using cached elevation for:', cacheKey);
+          return elevationCache.get(cacheKey);
+        }
+
+        const maxRetries = 3;
+        let attempt = 0;
+
+        while (attempt < maxRetries) {
+          try {
+            const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
+            const data = await response.json();
+            if (data.results && data.results[0] && data.results[0].elevation) {
+              const elevation = data.results[0].elevation;
+              elevationCache.set(cacheKey, elevation);
+              console.log('Fetched elevation:', elevation, 'for', cacheKey);
+              return elevation;
+            }
+            throw new Error("Invalid elevation data");
+          } catch (error) {
+            console.error(`Elevation fetch failed (attempt ${attempt + 1}):`, error);
+            attempt++;
+            if (attempt === maxRetries) {
+              document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation after retries.";
+              const fallbackElevation = lat < 7 ? 100 : lat < 10 ? 400 : 300;
+              elevationCache.set(cacheKey, fallbackElevation);
+              console.log('Using fallback elevation:', fallbackElevation, 'for', cacheKey);
+              return fallbackElevation;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-          throw new Error("Invalid elevation data");
-        } catch (error) {
-          console.error('Elevation fetch failed:', error);
-          if (lat < 7) return 100;
-          else if (lat < 10) return 400;
-          else return 300;
         }
       }
 
@@ -670,13 +693,21 @@
               agl = correctedAltitude - elevation;
               if (agl < 0) {
                 console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
-                agl = 0;
-                document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
+                document.getElementById('errorOutput').textContent = `Warning: Negative AGL (${agl.toFixed(1)}m). Verify GPS altitude or elevation data.`;
               }
+              lastAgl = agl; // Store the AGL even if negative
             } else {
               document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
             }
             console.log('GPS update:', { lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
+            console.log('AGL calculation details:', {
+              altitude,
+              geoidHeight: geoidHeight !== null ? geoidHeight : 'null',
+              elevation: elevation !== null ? elevation : 'null',
+              correctedAltitude: correctedAltitude !== null ? correctedAltitude : 'null',
+              agl: agl !== null ? agl : 'null',
+              isGps
+            });
           }
         } else if (id) {
           if (currentUserLocation) {
@@ -690,25 +721,11 @@
         document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
         document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
-        document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : "N/A";
+        document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : (lastAgl !== null ? `${lastAgl.toFixed(1)}m` : "N/A");
+        console.log('aglOutput set to:', document.getElementById('aglOutput').textContent);
         document.getElementById('distanceOutput').textContent = distance;
         document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
-
-        if (isGps) {
-          if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
-          else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
-          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
-        } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
-          enemyCounter = Math.max(enemyCounter, id);
-          const marker = L.marker([lat, lon], { icon: redIcon })
-            .bindPopup(`Enemy ${id}`)
-            .addTo(enemyLayer)
-            .openPopup();
-          enemyMarkers.push({ id, lat, lon, marker });
-          saveEnemyMarker(lat, lon, id);
-          shouldUpdateDropdown = true;
-        }
 
         if (shouldUpdateDropdown) {
           console.log('Triggering dropdown update with selectedId:', id || enemySelect.value);
@@ -784,6 +801,7 @@
         localStorage.removeItem('enemyMarkers');
         currentUserLocation = null;
         lastUserLocation = null;
+        lastAgl = null; // Reset lastAgl when clearing markers
         updateEnemyDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
@@ -858,7 +876,6 @@
         if (selectedId) {
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
-            // Update output with enemy coordinates only, not current GPS location
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           } else {
