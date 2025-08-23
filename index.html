@@ -488,7 +488,7 @@
         localStorage.setItem('enemyMarkers', JSON.stringify(markers));
       }
 
-      function updateEnemyDropdown() {
+      function updateEnemyDropdown(selectedId = null) {
         // Clear existing options
         enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
         // Add unique enemy markers with distance if user location is available
@@ -509,6 +509,7 @@
               label += ` (${distance} km)`;
             }
             option.textContent = label;
+            option.selected = marker.id == selectedId;
             enemySelect.appendChild(option);
           }
         });
@@ -599,6 +600,12 @@
           if (currentUserLocation) {
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + " km";
           }
+        } else if (enemySelect.value && currentUserLocation) {
+          // If no id but an enemy is selected, update distance for the selected enemy
+          const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
+          if (selectedMarker) {
+            distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, selectedMarker.lat, selectedMarker.lon).toFixed(2) + " km";
+          }
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -615,6 +622,18 @@
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
+          // Update distance for selected enemy if any
+          if (enemySelect.value) {
+            const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
+            if (selectedMarker && currentUserLocation) {
+              document.getElementById('distanceOutput').textContent = calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                selectedMarker.lat,
+                selectedMarker.lon
+              ).toFixed(2) + " km";
+            }
+          }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
           enemyCounter = Math.max(enemyCounter, id);
           const marker = L.marker([lat, lon], { icon: redIcon })
@@ -623,7 +642,7 @@
             .openPopup();
           enemyMarkers.push({ id, lat, lon, marker });
           saveEnemyMarker(lat, lon, id);
-          updateEnemyDropdown();
+          updateEnemyDropdown(id); // Pass selected ID to highlight in dropdown
         }
       }
 
@@ -740,6 +759,7 @@
           if (selectedMarker) {
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+            updateEnemyDropdown(selectedId); // Ensure dropdown reflects current selection
           }
         } else {
           ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
