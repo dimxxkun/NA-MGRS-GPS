@@ -63,9 +63,11 @@
         <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput" aria-label="Copy DMS coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">📋 Copy</button></div>
-        <div class="coord-line"><strong>Altitude:</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy Altitude">📋 Copy</button></div>
-        <p><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></p>
-        <p><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></p>
+        <!-- Modified: Added AGL and renamed Altitude to ASL for clarity -->
+        <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">📋 Copy</button></div>
+        <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">📋 Copy</button></div>
+        <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
+        <div class="coord-line"><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></div>
         <p class="status" id="statusOutput"></p>
         <p class="error" id="errorOutput"></p>
       </div>
@@ -156,6 +158,21 @@
         getLocationBtn.disabled = true;
       }
 
+      // New: Simplified geoid height lookup for Nigeria (mock EGM96 data)
+      function getGeoidHeight(lat, lon) {
+        // In Nigeria, geoid heights (EGM96) range ~10–40m. This is a mock function.
+        // Replace with actual EGM96 data (e.g., JSON lookup or API) for production.
+        // Example: Nigeria's geoid height is ~20–30m in most areas.
+        return 25; // Mock average geoid height in meters for Nigeria
+      }
+
+      // New: Mock DEM for terrain elevation (replace with SRTM or API in production)
+      async function getTerrainElevation(lat, lon) {
+        // Mock function: assumes flat terrain at 300m for Nigeria (e.g., central plateau).
+        // In practice, use SRTM 30m data or a server-side API (e.g., Copernicus DEM).
+        return 300; // Mock elevation in meters
+      }
+
       function loadEnemyMarkers() {
         const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
         enemyMarkers = [];
@@ -231,11 +248,28 @@
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
+        // New: Apply geoid correction and calculate AGL
+        let correctedAltitude = altitude;
+        let agl = null;
+        if (altitude !== null && isGps) {
+          const geoidHeight = getGeoidHeight(lat, lon);
+          correctedAltitude = altitude - geoidHeight;
+          getTerrainElevation(lat, lon).then(elevation => {
+            agl = correctedAltitude - elevation;
+            document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
+          }).catch(() => {
+            document.getElementById('aglOutput').textContent = "N/A";
+            document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation.";
+          });
+        } else {
+          document.getElementById('aglOutput').textContent = "N/A";
+        }
+
         document.getElementById('mgrsOutput').textContent = mgrs;
         document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
         document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
-        document.getElementById('altitudeOutput').textContent = altitude !== null ? `${altitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
+        document.getElementById('altitudeOutput').textContent = correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
         document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
@@ -314,7 +348,7 @@
         enemyCounter = 0;
         localStorage.removeItem('enemyMarkers');
         updateEnemyDropdown();
-        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
       centerBtn.addEventListener('click', () => {
@@ -340,7 +374,7 @@
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           }
         } else {
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         }
       });
 
