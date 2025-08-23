@@ -355,6 +355,7 @@
       ).addTo(map);
 
       // Add Search Control
+      let searchMarker = null;
       L.Control.geocoder({
         defaultMarkGeocode: false,
         placeholder: 'Search for a location...',
@@ -363,11 +364,17 @@
       }).on('markgeocode', function(e) {
         const latlng = e.geocode.center;
         map.flyTo(latlng, 12);
-        L.marker(latlng, { icon: greenIcon })
+        // Remove previous search marker if it exists
+        if (searchMarker) {
+          map.removeLayer(searchMarker);
+        }
+        // Add new temporary search marker
+        searchMarker = L.marker(latlng, { icon: greenIcon })
           .addTo(map)
           .bindPopup(e.geocode.name)
           .openPopup();
-        updateCoordinates(latlng.lat, latlng.lng, null, null, null, false);
+        // Update coordinates without tagging as enemy
+        updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
       }).addTo(map);
 
       // Handle tile loading errors
@@ -572,19 +579,17 @@
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
-        } else {
-          if (!id) {
-            enemyCounter++;
-            id = enemyCounter;
-            const marker = L.marker([lat, lon], { icon: redIcon })
-              .bindPopup(`Enemy ${id}`)
-              .addTo(enemyLayer)
-              .openPopup();
-            enemyMarkers.push({ id, lat, lon, marker });
-            saveEnemyMarker(lat, lon, id);
-            updateEnemyDropdown();
-            enemySelect.value = id;
-          }
+        } else if (id) {
+          // Only add to enemy markers if an ID is provided (i.e., via selectEnemyBtn)
+          enemyCounter = Math.max(enemyCounter, id);
+          const marker = L.marker([lat, lon], { icon: redIcon })
+            .bindPopup(`Enemy ${id}`)
+            .addTo(enemyLayer)
+            .openPopup();
+          enemyMarkers.push({ id, lat, lon, marker });
+          saveEnemyMarker(lat, lon, id);
+          updateEnemyDropdown();
+          enemySelect.value = id;
         }
       }
 
@@ -634,7 +639,7 @@
       selectEnemyBtn.addEventListener('click', () => {
         map.getContainer().style.cursor = 'crosshair';
         map.once('click', async e => {
-          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false);
+          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, enemyCounter + 1);
           map.getContainer().style.cursor = '';
         });
       });
@@ -645,6 +650,11 @@
         enemyCounter = 0;
         localStorage.removeItem('enemyMarkers');
         updateEnemyDropdown();
+        // Clear temporary search marker
+        if (searchMarker) {
+          map.removeLayer(searchMarker);
+          searchMarker = null;
+        }
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
