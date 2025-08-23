@@ -63,7 +63,6 @@
         <div class="coord-line"><strong>Lat/Long:</strong> <span id="latLonOutput">N/A</span> <button class="copy-btn" data-target="latLonOutput" aria-label="Copy Lat/Long coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>DMS:</strong> <span id="dmsOutput">N/A</span> <button class="copy-btn" data-target="dmsOutput" aria-label="Copy DMS coordinates">📋 Copy</button></div>
         <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">📋 Copy</button></div>
-        <!-- Modified: Added AGL and renamed Altitude to ASL for clarity -->
         <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">📋 Copy</button></div>
         <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">📋 Copy</button></div>
         <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
@@ -77,6 +76,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
   <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
+  <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const map = L.map('map').setView([9.0765, 7.3986], 8);
@@ -166,11 +166,33 @@
         return 25; // Mock average geoid height in meters for Nigeria
       }
 
-      // New: Mock DEM for terrain elevation (replace with SRTM or API in production)
+      // New: Integrated geotiff.js for DEM processing
+      let tiff = null;
+      async function loadDEM() {
+        try {
+          // Replace with your actual SRTM 30m GeoTIFF URL or local path for Nigeria
+          // Example: Download from USGS EarthExplorer or OpenTopography and host locally
+          // For testing, use a public tile e.g., 'https://s3.amazonaws.com/elevation-tiles-prod/geotiff/9/174/241.tif' (sample tile, not Nigeria-specific)
+          tiff = await GeoTIFF.fromUrl('https://example.com/nigeria_srtm30m.tif'); // Placeholder - replace with real URL
+        } catch (err) {
+          document.getElementById('errorOutput').textContent = 'Failed to load DEM file: ' + err.message;
+          throw err;
+        }
+      }
+
       async function getTerrainElevation(lat, lon) {
-        // Mock function: assumes flat terrain at 300m for Nigeria (e.g., central plateau).
-        // In practice, use SRTM 30m data or a server-side API (e.g., Copernicus DEM).
-        return 300; // Mock elevation in meters
+        if (!tiff) await loadDEM();
+        const image = await tiff.getImage(0); // Assume first image
+        const bbox = image.getBoundingBox(); // [left, bottom, right, top]
+        const width = image.getWidth();
+        const height = image.getHeight();
+        const x = Math.floor(((lon - bbox[0]) / (bbox[2] - bbox[0])) * width);
+        const y = Math.floor(((lat - bbox[3]) / (bbox[1] - bbox[3])) * height);
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+          throw new Error('Coordinates outside DEM bounds');
+        }
+        const data = await image.readRasters({ window: [x, y, x + 1, y + 1], interleave: false });
+        return data[0][0]; // Elevation value
       }
 
       function loadEnemyMarkers() {
@@ -248,7 +270,7 @@
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
-        // New: Apply geoid correction and calculate AGL
+        // New: Apply geoid correction and calculate AGL using geotiff.js
         let correctedAltitude = altitude;
         let agl = null;
         if (altitude !== null && isGps) {
@@ -257,9 +279,9 @@
           getTerrainElevation(lat, lon).then(elevation => {
             agl = correctedAltitude - elevation;
             document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
-          }).catch(() => {
+          }).catch(err => {
             document.getElementById('aglOutput').textContent = "N/A";
-            document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation.";
+            document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation: " + err.message;
           });
         } else {
           document.getElementById('aglOutput').textContent = "N/A";
@@ -379,6 +401,8 @@
       });
 
       loadEnemyMarkers();
+      // Preload DEM on init for performance
+      loadDEM().catch(() => {});
     });
   </script>
 </body>
