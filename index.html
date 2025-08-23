@@ -203,7 +203,6 @@
     .status {
       color: #b0b0b0;
     }
-    /* Search Control Styling */
     .leaflet-control-geocoder {
       background: #1e2e1e;
       border: 1px solid #5a8a5a;
@@ -320,6 +319,7 @@
         <div class="coord-line"><strong>UTM:</strong> <span id="utmOutput">N/A</span> <button class="copy-btn" data-target="utmOutput" aria-label="Copy UTM coordinates">Copy</button></div>
         <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">Copy</button></div>
         <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">Copy</button></div>
+        <div class="coord-line"><strong>Distance:</strong> <span id="distanceOutput">N/A</span> <button class="copy-btn" data-target="distanceOutput" aria-label="Copy Distance">Copy</button></div>
         <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
         <div class="coord-line"><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></div>
         <button class="copy-all-btn" id="copyAllBtn" aria-label="Copy all coordinates">Copy All Coordinates</button>
@@ -363,7 +363,6 @@
       }).on('markgeocode', function(e) {
         const latlng = e.geocode.center;
         map.flyTo(latlng, 12);
-        // Update coordinates without adding any marker
         updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
       }).addTo(map);
 
@@ -392,6 +391,7 @@
       const enemyLayer = L.layerGroup().addTo(map);
       let enemyCounter = 0;
       let enemyMarkers = [];
+      let currentUserLocation = null; // Store user's current location
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -425,6 +425,18 @@
       if (!navigator.geolocation) {
         errorOutput.textContent = "Geolocation is not supported by this browser.";
         getLocationBtn.disabled = true;
+      }
+
+      // Calculate distance using Haversine formula (returns distance in kilometers)
+      function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Earth's radius in kilometers
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in kilometers
       }
 
       // Geoid height lookup for Nigeria (approximate EGM96 data)
@@ -479,14 +491,24 @@
       function updateEnemyDropdown() {
         // Clear existing options
         enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
-        // Add unique enemy markers
+        // Add unique enemy markers with distance if user location is available
         const uniqueIds = new Set(enemyMarkers.map(marker => marker.id));
         uniqueIds.forEach(id => {
           const marker = enemyMarkers.find(m => m.id === id);
           if (marker) {
             const option = document.createElement('option');
             option.value = marker.id;
-            option.textContent = `Enemy ${marker.id}`;
+            let label = `Enemy ${marker.id}`;
+            if (currentUserLocation) {
+              const distance = calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                marker.lat,
+                marker.lon
+              ).toFixed(2);
+              label += ` (${distance} km)`;
+            }
+            option.textContent = label;
             enemySelect.appendChild(option);
           }
         });
@@ -498,9 +520,18 @@
           const lon = marker.lon;
           let mgrs;
           try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
-          return { id: `Enemy ${marker.id}`, lat, lon, mgrs };
+          let distance = "N/A";
+          if (currentUserLocation) {
+            distance = calculateDistance(
+              currentUserLocation.lat,
+              currentUserLocation.lon,
+              lat,
+              lon
+            ).toFixed(2) + " km";
+          }
+          return { id: `Enemy ${marker.id}`, lat, lon, mgrs, distance };
         });
-        const csv = 'ID,Latitude,Longitude,MGRS\n' + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs}`).join('\n');
+        const csv = 'ID,Latitude,Longitude,MGRS,Distance\n' + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs},${d.distance}`).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -540,7 +571,10 @@
 
         let correctedAltitude = altitude;
         let agl = null;
-        if (isGps && altitude !== null) {
+        let distance = "N/A";
+        if (isGps) {
+          currentUserLocation = { lat, lon }; // Update user location
+          updateEnemyDropdown(); // Update dropdown with new distances
           const geoidHeight = getGeoidHeight(lat, lon);
           if (geoidHeight !== null) {
             correctedAltitude = altitude - geoidHeight;
@@ -560,6 +594,11 @@
             document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
           }
           console.log({ lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
+        } else if (id) {
+          // Calculate distance for selected enemy if user location is available
+          if (currentUserLocation) {
+            distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + " km";
+          }
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -568,6 +607,7 @@
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
         document.getElementById('altitudeOutput').textContent = correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
         document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
+        document.getElementById('distanceOutput').textContent = distance;
         document.getElementById('accuracyOutput').textContent = accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
 
@@ -576,7 +616,6 @@
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
-          // Only add new enemy markers if the ID is not already in use
           enemyCounter = Math.max(enemyCounter, id);
           const marker = L.marker([lat, lon], { icon: redIcon })
             .bindPopup(`Enemy ${id}`)
@@ -614,6 +653,9 @@
       function stopTracking() {
         if (watchId) navigator.geolocation.clearWatch(watchId);
         watchId = null; isTracking = false; isFirstFix = true;
+        currentUserLocation = null; // Clear user location
+        updateEnemyDropdown(); // Update dropdown to remove distances
+        document.getElementById('distanceOutput').textContent = "N/A";
         getLocationBtn.textContent = "Start Tracking Location";
         if (!map.hasLayer(esriTerrain)) {
           statusOutput.textContent = "";
@@ -645,7 +687,7 @@
         enemyCounter = 0;
         localStorage.removeItem('enemyMarkers');
         updateEnemyDropdown();
-        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
 
       centerBtn.addEventListener('click', () => {
@@ -676,6 +718,7 @@
           `UTM: ${document.getElementById('utmOutput').textContent}`,
           `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
           `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
+          `Distance: ${document.getElementById('distanceOutput').textContent}`,
           `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
           `Last Updated: ${document.getElementById('timestampOutput').textContent}`
         ].join('\n');
@@ -699,7 +742,7 @@
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           }
         } else {
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         }
       });
 
