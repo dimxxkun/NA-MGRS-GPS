@@ -466,8 +466,8 @@
             .bindPopup(`Enemy ${marker.id}`)
             .addTo(enemyLayer);
           enemyMarkers.push({ id: marker.id, lat: marker.lat, lon: marker.lon, marker: leafletMarker });
-          updateEnemyDropdown();
         });
+        updateEnemyDropdown();
       }
 
       function saveEnemyMarker(lat, lon, id) {
@@ -477,12 +477,18 @@
       }
 
       function updateEnemyDropdown() {
+        // Clear existing options
         enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
-        enemyMarkers.forEach(marker => {
-          const option = document.createElement('option');
-          option.value = marker.id;
-          option.textContent = `Enemy ${marker.id}`;
-          enemySelect.appendChild(option);
+        // Add unique enemy markers
+        const uniqueIds = new Set(enemyMarkers.map(marker => marker.id));
+        uniqueIds.forEach(id => {
+          const marker = enemyMarkers.find(m => m.id === id);
+          if (marker) {
+            const option = document.createElement('option');
+            option.value = marker.id;
+            option.textContent = `Enemy ${marker.id}`;
+            enemySelect.appendChild(option);
+          }
         });
       }
 
@@ -569,8 +575,8 @@
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
-        } else if (id) {
-          // Only add to enemy markers if an ID is provided (i.e., via selectEnemyBtn)
+        } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
+          // Only add new enemy markers if the ID is not already in use
           enemyCounter = Math.max(enemyCounter, id);
           const marker = L.marker([lat, lon], { icon: redIcon })
             .bindPopup(`Enemy ${id}`)
@@ -579,7 +585,6 @@
           enemyMarkers.push({ id, lat, lon, marker });
           saveEnemyMarker(lat, lon, id);
           updateEnemyDropdown();
-          enemySelect.value = id;
         }
       }
 
