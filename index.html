@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nigerian Army GPS Coordinate System</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha512-Zcn6bjR/8ysueVwgobF2TLI6L7S24M9Y0l0S0I/X4KeD4kS4+cE+3d/9f7pj6/0iRYd/w2H0jNtzF7Hsjw0/0Vg==" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -87,10 +87,10 @@
       cursor: not-allowed;
       transform: none;
     }
-    #selectEnemyBtn, #clearEnemyBtn, #removeMarkerBtn {
+    #selectEnemyBtn, #clearEnemyBtn {
       background: linear-gradient(135deg, #a00, #800);
     }
-    #selectEnemyBtn:hover, #clearEnemyBtn:hover, #removeMarkerBtn:hover {
+    #selectEnemyBtn:hover, #clearEnemyBtn:hover {
       background: linear-gradient(135deg, #c00, #a00);
     }
     #toggleUnitsBtn {
@@ -216,7 +216,7 @@
       font-size: 0.95em;
     }
     .error {
-      color: #ff6666; /* Increased contrast */
+      color: #ff6666;
     }
     .status {
       color: #ffffff;
@@ -399,17 +399,32 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha512-nxwfD6hW7OQ1I6W3Q6W3/8f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0==" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
   <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('DOM loaded, initializing map and controls');
-      const map = L.map('map', {
-        keyboard: true, // Enable keyboard navigation
-        keyboardPanDelta: 100 // Pan distance for arrow keys
-      }).setView([9.0765, 7.3986], 8);
+
+      // Check secure context
+      if (!window.isSecureContext) {
+        document.getElementById('errorOutput').textContent = "This application requires a secure context (HTTPS or localhost). Please host the file on a server.";
+        return;
+      }
+
+      // Initialize map
+      let map;
+      try {
+        map = L.map('map', {
+          keyboard: true,
+          keyboardPanDelta: 100
+        }).setView([9.0765, 7.3986], 8);
+      } catch (error) {
+        console.error('Map initialization failed:', error);
+        document.getElementById('errorOutput').textContent = "Failed to initialize map. Please check your internet connection.";
+        return;
+      }
 
       // Basemaps
       const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
@@ -418,15 +433,6 @@
         attribution: '© OpenTopoMap (CC-BY-SA)'
       });
       const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
-
-      // Offline tile fallback (requires service worker setup)
-      /*
-      const offlineLayer = L.tileLayer.offline('path/to/local/tiles/{z}/{x}/{y}.png', {
-        attribution: 'Offline Tiles',
-        minZoom: 8,
-        maxZoom: 15
-      });
-      */
 
       const layerControl = L.control.layers(
         {
@@ -438,28 +444,33 @@
       ).addTo(map);
 
       // Add Search Control
-      L.Control.geocoder({
-        defaultMarkGeocode: false,
-        placeholder: 'Search for a location...',
-        geocoder: L.Control.Geocoder.nominatim(),
-        position: 'topright'
-      }).on('markgeocode', function(e) {
-        console.log('Search result selected:', e.geocode.center);
-        const latlng = e.geocode.center;
-        map.flyTo(latlng, 12);
-        updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
-        announceMapAction(`Map centered on ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
-      }).addTo(map);
+      try {
+        L.Control.geocoder({
+          defaultMarkGeocode: false,
+          placeholder: 'Search for a location...',
+          geocoder: L.Control.Geocoder.nominatim(),
+          position: 'topright'
+        }).on('markgeocode', function(e) {
+          console.log('Search result selected:', e.geocode.center);
+          const latlng = e.geocode.center;
+          map.flyTo(latlng, 12);
+          updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
+          announceMapAction(`Map centered on ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
+        }).addTo(map);
+      } catch (error) {
+        console.error('Search control failed:', error);
+        document.getElementById('errorOutput').textContent = "Search functionality unavailable.";
+      }
 
       // Handle tile loading errors
       esriSatellite.on('tileerror', () => {
-        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection or use offline mode.";
+        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
       });
       osmLayer.on('tileerror', () => {
-        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection or use offline mode.";
+        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
       });
       esriTerrain.on('tileerror', () => {
-        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection or use offline mode.";
+        document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
       });
 
       map.on('baselayerchange', (e) => {
@@ -516,7 +527,6 @@
       const historyLog = document.getElementById('historyLog');
       const historyList = document.getElementById('historyList');
 
-      // Update toggle units button label
       function updateToggleUnitsButton() {
         const otherUnit = distanceUnit === 'km' ? 'mi' : 'km';
         toggleUnitsBtn.textContent = `Units: ${distanceUnit.toUpperCase()} (Switch to ${otherUnit.toUpperCase()})`;
@@ -530,7 +540,6 @@
         getLocationBtn.disabled = true;
       }
 
-      // Announce map actions for screen readers
       function announceMapAction(message) {
         const liveRegion = document.createElement('div');
         liveRegion.setAttribute('aria-live', 'polite');
@@ -542,7 +551,6 @@
         setTimeout(() => liveRegion.remove(), 1000);
       }
 
-      // Dropdown event listeners
       enemySelect.addEventListener('mousedown', () => {
         console.log('Dropdown mousedown, setting isDropdownOpen = true');
         isDropdownOpen = true;
@@ -556,7 +564,6 @@
         isDropdownOpen = false;
       });
 
-      // Keyboard navigation for map
       map.on('keydown', (e) => {
         if (e.originalEvent.key === 'Enter' && map.getContainer().classList.contains('picking-mode')) {
           const center = map.getCenter();
@@ -570,7 +577,6 @@
         }
       });
 
-      // Touch gesture for marker placement
       map.on('dblclick', (e) => {
         if (map.getContainer().classList.contains('picking-mode')) {
           map.getContainer().classList.remove('picking-mode');
@@ -583,45 +589,49 @@
         }
       });
 
-      // Calculate distance using Haversine formula
       function calculateDistance(lat1, lon1, lat2, lon2) {
-        console.log('Calculating distance:', { lat1, lon1, lat2, lon2, distanceUnit });
-        const R = 6371; // Earth's radius in kilometers
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        let distance = R * c; // Distance in kilometers
-        if (distanceUnit === 'mi') {
-          distance *= 0.621371; // Convert to miles
+        try {
+          console.log('Calculating distance:', { lat1, lon1, lat2, lon2, distanceUnit });
+          const R = 6371;
+          const dLat = (lat2 - lat1) * Math.PI / 180;
+          const dLon = (lon2 - lon1) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          let distance = R * c;
+          if (distanceUnit === 'mi') distance *= 0.621371;
+          console.log('Distance calculated:', distance.toFixed(2), distanceUnit);
+          return distance;
+        } catch (error) {
+          console.error('Distance calculation error:', error);
+          return null;
         }
-        console.log('Distance calculated:', distance.toFixed(2), distanceUnit);
-        return distance;
       }
 
-      // Calculate bearing
       function calculateBearing(lat1, lon1, lat2, lon2) {
-        lat1 = lat1 * Math.PI / 180;
-        lat2 = lat2 * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const y = Math.sin(dLon) * Math.cos(lat2);
-        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-        let brng = Math.atan2(y, x) * 180 / Math.PI;
-        brng = (brng + 360) % 360;
-        return brng.toFixed(0) + '°';
+        try {
+          lat1 = lat1 * Math.PI / 180;
+          lat2 = lat2 * Math.PI / 180;
+          const dLon = (lon2 - lon1) * Math.PI / 180;
+          const y = Math.sin(dLon) * Math.cos(lat2);
+          const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+          let brng = Math.atan2(y, x) * 180 / Math.PI;
+          brng = (brng + 360) % 360;
+          return brng.toFixed(0) + '°';
+        } catch (error) {
+          console.error('Bearing calculation error:', error);
+          return "N/A";
+        }
       }
 
-      // Check if location has changed significantly (more than 10 meters)
       function hasLocationChanged(newLat, newLon, oldLat, oldLon) {
         if (!oldLat || !oldLon) return true;
-        const distance = calculateDistance(newLat, newLon, oldLat, oldLon) * (distanceUnit === 'km' ? 1000 : 1609.34); // Convert to meters
+        const distance = calculateDistance(newLat, newLon, oldLat, oldLon) * (distanceUnit === 'km' ? 1000 : 1609.34);
         console.log('Location change check:', { newLat, newLon, oldLat, oldLon, distance, significant: distance > 10 });
         return distance > 10;
       }
 
-      // Geoid height lookup for Nigeria (approximate EGM96 data)
       function getGeoidHeight(lat, lon) {
         try {
           if (lat < 7) return 20;
@@ -634,7 +644,6 @@
         }
       }
 
-      // Fetch terrain elevation from Open-Elevation API or fallback
       async function getTerrainElevation(lat, lon) {
         let isFallback = false;
         try {
@@ -655,10 +664,9 @@
         }
       }
 
-      // Load enemy markers from localStorage
       function loadEnemyMarkers() {
-        console.log('Loading enemy markers from localStorage');
         try {
+          console.log('Loading enemy markers from localStorage');
           const markers = JSON.parse(localStorage.getItem('enemyMarkers') || '[]');
           console.log('Loaded markers:', markers);
           enemyMarkers = [];
@@ -679,7 +687,6 @@
         }
       }
 
-      // Save enemy markers to localStorage
       function saveEnemyMarkers() {
         try {
           const markersToSave = enemyMarkers.map(m => ({ id: m.id, lat: m.lat, lon: m.lon }));
@@ -690,33 +697,37 @@
         }
       }
 
-      // Remove individual marker
       function removeMarker(id) {
-        const index = enemyMarkers.findIndex(m => m.id === id);
-        if (index !== -1) {
-          enemyMarkers[index].marker.remove();
-          enemyMarkers.splice(index, 1);
-          saveEnemyMarkers();
-          updateEnemyDropdown();
-          if (enemySelect.value == id) {
-            enemySelect.value = '';
-            if (currentUserLocation) {
-              updateCoordinates(
-                currentUserLocation.lat,
-                currentUserLocation.lon,
-                currentUserLocation.accuracy,
-                currentUserLocation.altitude,
-                currentUserLocation.altitudeAccuracy,
-                true
-              );
-            } else {
-              clearOutputs();
+        try {
+          const index = enemyMarkers.findIndex(m => m.id === id);
+          if (index !== -1) {
+            enemyMarkers[index].marker.remove();
+            enemyMarkers.splice(index, 1);
+            saveEnemyMarkers();
+            updateEnemyDropdown();
+            if (enemySelect.value == id) {
+              enemySelect.value = '';
+              if (currentUserLocation) {
+                updateCoordinates(
+                  currentUserLocation.lat,
+                  currentUserLocation.lon,
+                  currentUserLocation.accuracy,
+                  currentUserLocation.altitude,
+                  currentUserLocation.altitudeAccuracy,
+                  true
+                );
+              } else {
+                clearOutputs();
+              }
             }
+            announceMapAction(`Enemy marker ${id} removed`);
           }
+        } catch (error) {
+          console.error('Remove marker error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to remove marker.";
         }
       }
 
-      // Handle popup remove button
       map.on('popupopen', (e) => {
         const removeBtn = document.querySelector('.remove-btn');
         if (removeBtn) {
@@ -724,12 +735,10 @@
             const id = parseInt(removeBtn.dataset.id);
             removeMarker(id);
             map.closePopup();
-            announceMapAction(`Enemy marker ${id} removed`);
           });
         }
       });
 
-      // Debounced updateEnemyDropdown
       function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -743,270 +752,306 @@
       }
 
       const updateEnemyDropdown = debounce((selectedId = null) => {
-        console.log('Updating dropdown, selectedId:', selectedId, 'isDropdownOpen:', isDropdownOpen);
-        if (isDropdownOpen) {
-          console.log('Dropdown open, skipping update');
-          return;
-        }
-        const now = Date.now();
-        if (now - lastDropdownUpdate < 500) {
-          console.log('Too soon since last update:', now - lastDropdownUpdate);
-          return;
-        }
-        lastDropdownUpdate = now;
-
-        console.log('Current enemyMarkers:', enemyMarkers);
-        console.log('Current user location:', currentUserLocation);
-
-        enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
-        enemyMarkers.forEach(marker => {
-          let label = `Enemy ${marker.id}`;
-          if (currentUserLocation) {
-            const distance = calculateDistance(
-              currentUserLocation.lat,
-              currentUserLocation.lon,
-              marker.lat,
-              marker.lon
-            ).toFixed(2);
-            label += ` (${distance} ${distanceUnit})`;
+        try {
+          console.log('Updating dropdown, selectedId:', selectedId, 'isDropdownOpen:', isDropdownOpen);
+          if (isDropdownOpen) {
+            console.log('Dropdown open, skipping update');
+            return;
           }
-          const option = document.createElement('option');
-          option.value = marker.id;
-          option.textContent = label;
-          option.selected = marker.id == selectedId;
-          enemySelect.appendChild(option);
-        });
-        console.log('Dropdown updated, options:', enemySelect.options.length);
+          const now = Date.now();
+          if (now - lastDropdownUpdate < 500) {
+            console.log('Too soon since last update:', now - lastDropdownUpdate);
+            return;
+          }
+          lastDropdownUpdate = now;
+
+          enemySelect.innerHTML = '<option value="">Select an enemy...</option>';
+          enemyMarkers.forEach(marker => {
+            let label = `Enemy ${marker.id}`;
+            if (currentUserLocation) {
+              const distance = calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                marker.lat,
+                marker.lon
+              );
+              if (distance !== null) {
+                label += ` (${distance.toFixed(2)} ${distanceUnit})`;
+              }
+            }
+            const option = document.createElement('option');
+            option.value = marker.id;
+            option.textContent = label;
+            option.selected = marker.id == selectedId;
+            enemySelect.appendChild(option);
+          });
+          console.log('Dropdown updated, options:', enemySelect.options.length);
+        } catch (error) {
+          console.error('Dropdown update error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to update enemy dropdown.";
+        }
       }, 500);
 
-      // Export coordinates
       function exportCoordinates() {
-        console.log('Exporting coordinates, enemyMarkers:', enemyMarkers);
-        const data = enemyMarkers.map((marker, i) => {
-          const lat = marker.lat;
-          const lon = marker.lon;
-          let mgrs;
-          try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
-          let distance = "N/A";
-          let bearing = "N/A";
-          if (currentUserLocation) {
-            distance = calculateDistance(
-              currentUserLocation.lat,
-              currentUserLocation.lon,
-              lat,
-              lon
-            ).toFixed(2) + ` ${distanceUnit}`;
-            bearing = calculateBearing(
-              currentUserLocation.lat,
-              currentUserLocation.lon,
-              lat,
-              lon
-            );
-          }
-          return { id: `Enemy ${marker.id}`, lat, lon, mgrs, distance, bearing };
-        });
-        const csv = `ID,Latitude,Longitude,MGRS,Distance (${distanceUnit}),Bearing\n` + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs},${d.distance},${d.bearing}`).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `enemy_coordinates_${distanceUnit}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-
-      // Convert to DMS
-      function toDMS(lat, lon) {
-        function convert(coord, pos, neg) {
-          const absolute = Math.abs(coord);
-          const deg = Math.floor(absolute);
-          const minFloat = (absolute - deg) * 60;
-          const min = Math.floor(minFloat);
-          const sec = ((minFloat - min) * 60).toFixed(2);
-          const dir = coord >= 0 ? pos : neg;
-          return `${deg}°${min}'${sec}" ${dir}`;
+        try {
+          console.log('Exporting coordinates, enemyMarkers:', enemyMarkers);
+          const data = enemyMarkers.map((marker, i) => {
+            const lat = marker.lat;
+            const lon = marker.lon;
+            let mgrs;
+            try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
+            let distance = "N/A";
+            let bearing = "N/A";
+            if (currentUserLocation) {
+              const dist = calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                lat,
+                lon
+              );
+              if (dist !== null) {
+                distance = dist.toFixed(2) + ` ${distanceUnit}`;
+              }
+              bearing = calculateBearing(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                lat,
+                lon
+              );
+            }
+            return { id: `Enemy ${marker.id}`, lat, lon, mgrs, distance, bearing };
+          });
+          const csv = `ID,Latitude,Longitude,MGRS,Distance (${distanceUnit}),Bearing\n` + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs},${d.distance},${d.bearing}`).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `enemy_coordinates_${distanceUnit}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Export error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to export coordinates.";
         }
-        return `${convert(lat, "N", "S")}, ${convert(lon, "E", "W")}`;
       }
 
-      // Convert to UTM
+      function toDMS(lat, lon) {
+        try {
+          function convert(coord, pos, neg) {
+            const absolute = Math.abs(coord);
+            const deg = Math.floor(absolute);
+            const minFloat = (absolute - deg) * 60;
+            const min = Math.floor(minFloat);
+            const sec = ((minFloat - min) * 60).toFixed(2);
+            const dir = coord >= 0 ? pos : neg;
+            return `${deg}°${min}'${sec}" ${dir}`;
+          }
+          return `${convert(lat, "N", "S")}, ${convert(lon, "E", "W")}`;
+        } catch (error) {
+          console.error('DMS conversion error:', error);
+          return "N/A";
+        }
+      }
+
       function toUTM(lat, lon) {
         try {
           const zone = Math.floor((lon + 180) / 6) + 1;
           const utmProj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
           const [x, y] = proj4(utmProj, [lon, lat]);
           return `Zone ${zone}N: ${x.toFixed(2)}mE, ${y.toFixed(2)}mN`;
-        } catch {
+        } catch (error) {
+          console.error('UTM conversion error:', error);
           return "N/A";
         }
       }
 
-      // Clear output fields
       function clearOutputs() {
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       }
 
-      // Add to coordinate history
       function addToHistory(lat, lon, isGps, id) {
-        const entry = {
-          lat,
-          lon,
-          mgrs: document.getElementById('mgrsOutput').textContent,
-          latLon: document.getElementById('latLonOutput').textContent,
-          dms: document.getElementById('dmsOutput').textContent,
-          utm: document.getElementById('utmOutput').textContent,
-          altitude: document.getElementById('altitudeOutput').textContent,
-          agl: document.getElementById('aglOutput').textContent,
-          distance: document.getElementById('distanceOutput').textContent,
-          bearing: document.getElementById('bearingOutput').textContent,
-          accuracy: document.getElementById('accuracyOutput').textContent,
-          timestamp: document.getElementById('timestampOutput').textContent,
-          type: isGps ? 'GPS' : `Enemy ${id}`
-        };
-        coordinateHistory.unshift(entry);
-        if (coordinateHistory.length > 10) coordinateHistory.pop(); // Limit to 10 entries
-        updateHistoryLog();
+        try {
+          const entry = {
+            lat,
+            lon,
+            mgrs: document.getElementById('mgrsOutput').textContent,
+            latLon: document.getElementById('latLonOutput').textContent,
+            dms: document.getElementById('dmsOutput').textContent,
+            utm: document.getElementById('utmOutput').textContent,
+            altitude: document.getElementById('altitudeOutput').textContent,
+            agl: document.getElementById('aglOutput').textContent,
+            distance: document.getElementById('distanceOutput').textContent,
+            bearing: document.getElementById('bearingOutput').textContent,
+            accuracy: document.getElementById('accuracyOutput').textContent,
+            timestamp: document.getElementById('timestampOutput').textContent,
+            type: isGps ? 'GPS' : `Enemy ${id}`
+          };
+          coordinateHistory.unshift(entry);
+          if (coordinateHistory.length > 10) coordinateHistory.pop();
+          updateHistoryLog();
+        } catch (error) {
+          console.error('History update error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to update coordinate history.";
+        }
       }
 
-      // Update coordinate history log
       function updateHistoryLog() {
-        historyList.innerHTML = '';
-        coordinateHistory.forEach(entry => {
-          const li = document.createElement('li');
-          li.textContent = `${entry.type} - ${entry.latLon}, ${entry.distance}, ${entry.bearing} at ${entry.timestamp}`;
-          historyList.appendChild(li);
-        });
+        try {
+          historyList.innerHTML = '';
+          coordinateHistory.forEach(entry => {
+            const li = document.createElement('li');
+            li.textContent = `${entry.type} - ${entry.latLon}, ${entry.distance}, ${entry.bearing} at ${entry.timestamp}`;
+            historyList.appendChild(li);
+          });
+        } catch (error) {
+          console.error('History log render error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to render coordinate history.";
+        }
       }
 
-      // Update coordinates
       async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
-        console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, id });
-        let mgrs;
-        try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
+        try {
+          console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, id });
+          let mgrs;
+          try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
-        let correctedAltitude = altitude;
-        let agl = null;
-        let distance = "N/A";
-        let bearing = "N/A";
-        let shouldUpdateDropdown = false;
-        let isFallbackElevation = false;
+          let correctedAltitude = altitude;
+          let agl = null;
+          let distance = "N/A";
+          let bearing = "N/A";
+          let shouldUpdateDropdown = false;
+          let isFallbackElevation = false;
 
-        if (isGps) {
-          if (!lastUserLocation || hasLocationChanged(lat, lon, lastUserLocation.lat, lastUserLocation.lon)) {
-            const elevationData = await getTerrainElevation(lat, lon);
-            const elevation = elevationData.elevation;
-            isFallbackElevation = elevationData.isFallback;
-            const geoidHeight = getGeoidHeight(lat, lon);
-            if (geoidHeight !== null) {
-              correctedAltitude = altitude - geoidHeight;
-            } else {
-              correctedAltitude = null;
-              document.getElementById('errorOutput').textContent = "Geoid height unavailable.";
-            }
-            if (elevation !== null && correctedAltitude !== null) {
-              agl = correctedAltitude - elevation;
-              if (agl < 0) {
-                console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
-                agl = 0;
-                document.getElementById('errorOutput').textContent = "Altitude may be inaccurate (set to 0m).";
+          if (isGps) {
+            if (!lastUserLocation || hasLocationChanged(lat, lon, lastUserLocation.lat, lastUserLocation.lon)) {
+              const elevationData = await getTerrainElevation(lat, lon);
+              const elevation = elevationData.elevation;
+              isFallbackElevation = elevationData.isFallback;
+              const geoidHeight = getGeoidHeight(lat, lon);
+              if (geoidHeight !== null) {
+                correctedAltitude = altitude - geoidHeight;
+              } else {
+                correctedAltitude = null;
+                document.getElementById('errorOutput').textContent = "Geoid height unavailable.";
               }
-            } else {
-              document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
+              if (elevation !== null && correctedAltitude !== null) {
+                agl = correctedAltitude - elevation;
+                if (agl < 0) {
+                  console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
+                  agl = 0;
+                  document.getElementById('errorOutput').textContent = "Altitude may be inaccurate (set to 0m).";
+                }
+              } else {
+                document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
+              }
+              if (isFallbackElevation) {
+                document.getElementById('statusOutput').textContent = "Using approximate elevation data.";
+              }
+              currentUserLocation = { lat, lon, accuracy, altitude, altitudeAccuracy, correctedAltitude, agl };
+              lastUserLocation = { lat, lon };
+              shouldUpdateDropdown = true;
+              console.log('GPS update:', { lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
+              if (autoCenterChk.checked) {
+                map.flyTo([lat, lon], map.getZoom() || 15);
+                announceMapAction(`Map centered on ${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+              }
             }
-            if (isFallbackElevation) {
-              document.getElementById('statusOutput').textContent = "Using approximate elevation data.";
+          } else if (id) {
+            if (currentUserLocation) {
+              const dist = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon);
+              if (dist !== null) {
+                distance = dist.toFixed(2) + ` ${distanceUnit}`;
+              }
+              bearing = calculateBearing(currentUserLocation.lat, currentUserLocation.lon, lat, lon);
             }
-            currentUserLocation = { lat, lon, accuracy, altitude, altitudeAccuracy, correctedAltitude, agl };
-            lastUserLocation = { lat, lon };
             shouldUpdateDropdown = true;
-            console.log('GPS update:', { lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
-            if (autoCenterChk.checked) {
-              map.flyTo([lat, lon], map.getZoom() || 15);
-              announceMapAction(`Map centered on ${lat.toFixed(6)}, ${lon.toFixed(6)}`);
-            }
           }
-        } else if (id) {
-          if (currentUserLocation) {
-            distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
-            bearing = calculateBearing(currentUserLocation.lat, currentUserLocation.lon, lat, lon);
+
+          document.getElementById('mgrsOutput').textContent = mgrs;
+          document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+          document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
+          document.getElementById('utmOutput').textContent = toUTM(lat, lon);
+          document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
+          document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : "N/A";
+          document.getElementById('distanceOutput').textContent = distance;
+          document.getElementById('bearingOutput').textContent = bearing;
+          document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
+          document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+
+          if (isGps) {
+            if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
+            else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
+            if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
+            addToHistory(lat, lon, true);
+          } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
+            enemyCounter = Math.max(enemyCounter, id);
+            const marker = L.marker([lat, lon], { icon: redIcon, id })
+              .bindPopup(`Enemy ${id}<br><button class="remove-btn" data-id="${id}">Remove</button>`)
+              .addTo(enemyLayer)
+              .openPopup();
+            enemyMarkers.push({ id, lat, lon, marker });
+            saveEnemyMarkers();
+            shouldUpdateDropdown = true;
+            addToHistory(lat, lon, false, id);
           }
-          shouldUpdateDropdown = true;
-        }
 
-        document.getElementById('mgrsOutput').textContent = mgrs;
-        document.getElementById('latLonOutput').textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-        document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
-        document.getElementById('utmOutput').textContent = toUTM(lat, lon);
-        document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
-        document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : "N/A";
-        document.getElementById('distanceOutput').textContent = distance;
-        document.getElementById('bearingOutput').textContent = bearing;
-        document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
-        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
-
-        if (isGps) {
-          if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
-          else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
-          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
-          addToHistory(lat, lon, true);
-        } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
-          enemyCounter = Math.max(enemyCounter, id);
-          const marker = L.marker([lat, lon], { icon: redIcon, id })
-            .bindPopup(`Enemy ${id}<br><button class="remove-btn" data-id="${id}">Remove</button>`)
-            .addTo(enemyLayer)
-            .openPopup();
-          enemyMarkers.push({ id, lat, lon, marker });
-          saveEnemyMarkers();
-          shouldUpdateDropdown = true;
-          addToHistory(lat, lon, false, id);
-        }
-
-        if (shouldUpdateDropdown) {
-          console.log('Triggering dropdown update with selectedId:', id || enemySelect.value);
-          updateEnemyDropdown(id || enemySelect.value);
+          if (shouldUpdateDropdown) {
+            console.log('Triggering dropdown update with selectedId:', id || enemySelect.value);
+            updateEnemyDropdown(id || enemySelect.value);
+          }
+        } catch (error) {
+          console.error('Update coordinates error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to update coordinates.";
         }
       }
 
-      // Start tracking
       function startTracking() {
-        console.log('Starting GPS tracking');
-        watchId = navigator.geolocation.watchPosition(
-          async pos => {
-            await updateCoordinates(
-              pos.coords.latitude,
-              pos.coords.longitude,
-              pos.coords.accuracy,
-              pos.coords.altitude,
-              pos.coords.altitudeAccuracy,
-              true
-            );
-          },
-          err => {
-            console.error('Geolocation error:', err);
-            errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Error: ${err.message}`;
-            stopTracking();
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-        );
-        isTracking = true;
-        getLocationBtn.textContent = "Stop Tracking";
-        statusOutput.textContent = "Tracking Active";
-      }
-
-      // Stop tracking
-      function stopTracking() {
-        console.log('Stopping GPS tracking');
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        isTracking = false;
-        isFirstFix = true;
-        getLocationBtn.textContent = "Start Tracking Location";
-        if (!map.hasLayer(esriTerrain)) {
-          statusOutput.textContent = "";
+        try {
+          console.log('Starting GPS tracking');
+          watchId = navigator.geolocation.watchPosition(
+            async pos => {
+              await updateCoordinates(
+                pos.coords.latitude,
+                pos.coords.longitude,
+                pos.coords.accuracy,
+                pos.coords.altitude,
+                pos.coords.altitudeAccuracy,
+                true
+              );
+            },
+            err => {
+              console.error('Geolocation error:', err);
+              errorOutput.textContent = err.code === 1 ? "Location access denied by user." : `Geolocation error: ${err.message}`;
+              stopTracking();
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+          );
+          isTracking = true;
+          getLocationBtn.textContent = "Stop Tracking";
+          statusOutput.textContent = "Tracking Active";
+        } catch (error) {
+          console.error('Start tracking error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to start location tracking.";
         }
       }
 
-      // Handle visibility change
+      function stopTracking() {
+        try {
+          console.log('Stopping GPS tracking');
+          if (watchId) navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+          isTracking = false;
+          isFirstFix = true;
+          getLocationBtn.textContent = "Start Tracking Location";
+          if (!map.hasLayer(esriTerrain)) {
+            statusOutput.textContent = "";
+          }
+        } catch (error) {
+          console.error('Stop tracking error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to stop tracking.";
+        }
+      }
+
       document.addEventListener('visibilitychange', () => {
         if (document.hidden && isTracking) {
           console.log('Page hidden, pausing tracking');
@@ -1015,156 +1060,98 @@
         }
       });
 
-      // Button event listeners
       getLocationBtn.addEventListener('click', () => {
         console.log('Location button clicked, isTracking:', isTracking);
         if (isTracking) { stopTracking(); } else { startTracking(); }
       });
 
       selectEnemyBtn.addEventListener('click', () => {
-        console.log('Select Enemy button clicked');
-        map.getContainer().classList.add('picking-mode');
-        map.getContainer().style.cursor = 'crosshair';
-        previewMarker.setOpacity(0.5);
-        const moveHandler = (e) => {
-          previewMarker.setLatLng(e.latlng);
-        };
-        map.on('mousemove', moveHandler);
-        map.once('click', async e => {
-          map.off('mousemove', moveHandler);
-          map.getContainer().classList.remove('picking-mode');
-          map.getContainer().style.cursor = '';
-          previewMarker.setOpacity(0);
-          if (confirm('Place enemy marker here?')) {
-            await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, enemyCounter + 1);
-            announceMapAction(`Enemy marker placed at ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`);
-          }
-        });
+        try {
+          console.log('Select Enemy button clicked');
+          map.getContainer().classList.add('picking-mode');
+          map.getContainer().style.cursor = 'crosshair';
+          previewMarker.setOpacity(0.5);
+          const moveHandler = (e) => {
+            previewMarker.setLatLng(e.latlng);
+          };
+          map.on('mousemove', moveHandler);
+          map.once('click', async e => {
+            map.off('mousemove', moveHandler);
+            map.getContainer().classList.remove('picking-mode');
+            map.getContainer().style.cursor = '';
+            previewMarker.setOpacity(0);
+            if (confirm('Place enemy marker here?')) {
+              await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, enemyCounter + 1);
+              announceMapAction(`Enemy marker placed at ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`);
+            }
+          });
+        } catch (error) {
+          console.error('Select enemy error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to select enemy coordinates.";
+        }
       });
 
       clearEnemyBtn.addEventListener('click', () => {
-        console.log('Clear Enemy Markers button clicked');
-        enemyLayer.clearLayers();
-        enemyMarkers = [];
-        enemyCounter = 0;
-        localStorage.removeItem('enemyMarkers');
-        currentUserLocation = null;
-        lastUserLocation = null;
-        updateEnemyDropdown();
-        clearOutputs();
-        announceMapAction('All enemy markers cleared');
+        try {
+          console.log('Clear Enemy Markers button clicked');
+          enemyLayer.clearLayers();
+          enemyMarkers = [];
+          enemyCounter = 0;
+          localStorage.removeItem('enemyMarkers');
+          currentUserLocation = null;
+          lastUserLocation = null;
+          updateEnemyDropdown();
+          clearOutputs();
+          announceMapAction('All enemy markers cleared');
+        } catch (error) {
+          console.error('Clear markers error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to clear enemy markers.";
+        }
       });
 
       centerBtn.addEventListener('click', () => {
-        console.log('Center button clicked');
-        if (gpsMarker) {
-          map.flyTo(gpsMarker.getLatLng(), 15);
-          announceMapAction(`Map centered on ${gpsMarker.getLatLng().lat.toFixed(6)}, ${gpsMarker.getLatLng().lng.toFixed(6)}`);
+        try {
+          console.log('Center button clicked');
+          if (gpsMarker) {
+            map.flyTo(gpsMarker.getLatLng(), 15);
+            announceMapAction(`Map centered on ${gpsMarker.getLatLng().lat.toFixed(6)}, ${gpsMarker.getLatLng().lng.toFixed(6)}`);
+          } else {
+            document.getElementById('errorOutput').textContent = "No location data available to center map.";
+          }
+        } catch (error) {
+          console.error('Center map error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to center map.";
         }
       });
 
       exportBtnIn.addEventListener('click', exportCoordinates);
 
       toggleUnitsBtn.addEventListener('click', () => {
-        console.log('Toggle Units button clicked, current unit:', distanceUnit);
-        distanceUnit = distanceUnit === 'km' ? 'mi' : 'km';
-        localStorage.setItem('distanceUnit', distanceUnit);
-        updateToggleUnitsButton();
-        updateEnemyDropdown(enemySelect.value);
-        if (enemySelect.value && currentUserLocation) {
-          const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
-          if (selectedMarker) {
-            document.getElementById('distanceOutput').textContent = calculateDistance(
-              currentUserLocation.lat,
-              currentUserLocation.lon,
-              selectedMarker.lat,
-              selectedMarker.lon
-            ).toFixed(2) + ` ${distanceUnit}`;
-            document.getElementById('bearingOutput').textContent = calculateBearing(
-              currentUserLocation.lat,
-              currentUserLocation.lon,
-              selectedMarker.lat,
-              selectedMarker.lon
-            );
-          }
-        } else if (!enemySelect.value && currentUserLocation) {
-          updateCoordinates(
-            currentUserLocation.lat,
-            currentUserLocation.lon,
-            currentUserLocation.accuracy,
-            currentUserLocation.altitude,
-            currentUserLocation.altitudeAccuracy,
-            true
-          );
-        }
-      });
-
-      document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          console.log('Copy button clicked for:', btn.dataset.target);
-          const target = document.getElementById(btn.dataset.target);
-          navigator.clipboard.writeText(target.textContent).then(() => {
-            btn.classList.add('copied');
-            btn.textContent = 'Copied';
-            setTimeout(() => {
-              btn.classList.remove('copied');
-              btn.textContent = 'Copy';
-              btn.focus();
-            }, 2000);
-          });
-        });
-      });
-
-      document.getElementById('copyAllBtn').addEventListener('click', () => {
-        console.log('Copy All button clicked');
-        const outputs = [
-          `MGRS: ${document.getElementById('mgrsOutput').textContent}`,
-          `Lat/Long: ${document.getElementById('latLonOutput').textContent}`,
-          `DMS: ${document.getElementById('dmsOutput').textContent}`,
-          `UTM: ${document.getElementById('utmOutput').textContent}`,
-          `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
-          `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
-          `Distance: ${document.getElementById('distanceOutput').textContent}`,
-          `Bearing: ${document.getElementById('bearingOutput').textContent}`,
-          `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
-          `Last Updated: ${document.getElementById('timestampOutput').textContent}`
-        ].join('\n');
-        navigator.clipboard.writeText(outputs).then(() => {
-          const btn = document.getElementById('copyAllBtn');
-          btn.classList.add('copied');
-          btn.textContent = 'Copied All';
-          setTimeout(() => {
-            btn.classList.remove('copied');
-            btn.textContent = 'Copy All Coordinates';
-            btn.focus();
-          }, 2000);
-        });
-      });
-
-      historyBtn.addEventListener('click', () => {
-        console.log('History button clicked');
-        historyLog.classList.toggle('active');
-        historyBtn.textContent = historyLog.classList.contains('active') ? 'Hide Coordinate History' : 'Show Coordinate History';
-        historyBtn.focus();
-      });
-
-      enemySelect.addEventListener('change', async () => {
-        console.log('Enemy select changed, value:', enemySelect.value);
-        const selectedId = enemySelect.value;
-        if (selectedId) {
-          const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
-          if (selectedMarker) {
-            await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
-            map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
-            announceMapAction(`Map centered on Enemy ${selectedId} at ${selectedMarker.lat.toFixed(6)}, ${selectedMarker.lon.toFixed(6)}`);
-          } else {
-            console.error('Selected marker not found:', selectedId);
-            document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
-          }
-        } else {
-          console.log('No enemy selected');
-          if (currentUserLocation) {
-            await updateCoordinates(
+        try {
+          console.log('Toggle Units button clicked, current unit:', distanceUnit);
+          distanceUnit = distanceUnit === 'km' ? 'mi' : 'km';
+          localStorage.setItem('distanceUnit', distanceUnit);
+          updateToggleUnitsButton();
+          updateEnemyDropdown(enemySelect.value);
+          if (enemySelect.value && currentUserLocation) {
+            const selectedMarker = enemyMarkers.find(marker => marker.id == enemySelect.value);
+            if (selectedMarker) {
+              const dist = calculateDistance(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                selectedMarker.lat,
+                selectedMarker.lon
+              );
+              document.getElementById('distanceOutput').textContent = dist !== null ? dist.toFixed(2) + ` ${distanceUnit}` : "N/A";
+              document.getElementById('bearingOutput').textContent = calculateBearing(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                selectedMarker.lat,
+                selectedMarker.lon
+              );
+            }
+          } else if (!enemySelect.value && currentUserLocation) {
+            updateCoordinates(
               currentUserLocation.lat,
               currentUserLocation.lon,
               currentUserLocation.accuracy,
@@ -1172,9 +1159,115 @@
               currentUserLocation.altitudeAccuracy,
               true
             );
-          } else {
-            clearOutputs();
           }
+        } catch (error) {
+          console.error('Toggle units error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to toggle units.";
+        }
+      });
+
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          try {
+            console.log('Copy button clicked for:', btn.dataset.target);
+            const target = document.getElementById(btn.dataset.target);
+            navigator.clipboard.writeText(target.textContent).then(() => {
+              btn.classList.add('copied');
+              btn.textContent = 'Copied';
+              setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.textContent = 'Copy';
+                btn.focus();
+              }, 2000);
+            }).catch(err => {
+              console.error('Clipboard error:', err);
+              document.getElementById('errorOutput').textContent = "Failed to copy text.";
+            });
+          } catch (error) {
+            console.error('Copy button error:', error);
+            document.getElementById('errorOutput').textContent = "Failed to copy text.";
+          }
+        });
+      });
+
+      document.getElementById('copyAllBtn').addEventListener('click', () => {
+        try {
+          console.log('Copy All button clicked');
+          const outputs = [
+            `MGRS: ${document.getElementById('mgrsOutput').textContent}`,
+            `Lat/Long: ${document.getElementById('latLonOutput').textContent}`,
+            `DMS: ${document.getElementById('dmsOutput').textContent}`,
+            `UTM: ${document.getElementById('utmOutput').textContent}`,
+            `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
+            `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
+            `Distance: ${document.getElementById('distanceOutput').textContent}`,
+            `Bearing: ${document.getElementById('bearingOutput').textContent}`,
+            `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
+            `Last Updated: ${document.getElementById('timestampOutput').textContent}`
+          ].join('\n');
+          navigator.clipboard.writeText(outputs).then(() => {
+            const btn = document.getElementById('copyAllBtn');
+            btn.classList.add('copied');
+            btn.textContent = 'Copied All';
+            setTimeout(() => {
+              btn.classList.remove('copied');
+              btn.textContent = 'Copy All Coordinates';
+              btn.focus();
+            }, 2000);
+          }).catch(err => {
+            console.error('Clipboard error:', err);
+            document.getElementById('errorOutput').textContent = "Failed to copy all coordinates.";
+          });
+        } catch (error) {
+          console.error('Copy all error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to copy all coordinates.";
+        }
+      });
+
+      historyBtn.addEventListener('click', () => {
+        try {
+          console.log('History button clicked');
+          historyLog.classList.toggle('active');
+          historyBtn.textContent = historyLog.classList.contains('active') ? 'Hide Coordinate History' : 'Show Coordinate History';
+          historyBtn.focus();
+        } catch (error) {
+          console.error('History button error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to toggle history.";
+        }
+      });
+
+      enemySelect.addEventListener('change', async () => {
+        try {
+          console.log('Enemy select changed, value:', enemySelect.value);
+          const selectedId = enemySelect.value;
+          if (selectedId) {
+            const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
+            if (selectedMarker) {
+              await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
+              map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+              announceMapAction(`Map centered on Enemy ${selectedId} at ${selectedMarker.lat.toFixed(6)}, ${selectedMarker.lon.toFixed(6)}`);
+            } else {
+              console.error('Selected marker not found:', selectedId);
+              document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
+            }
+          } else {
+            console.log('No enemy selected');
+            if (currentUserLocation) {
+              await updateCoordinates(
+                currentUserLocation.lat,
+                currentUserLocation.lon,
+                currentUserLocation.accuracy,
+                currentUserLocation.altitude,
+                currentUserLocation.altitudeAccuracy,
+                true
+              );
+            } else {
+              clearOutputs();
+            }
+          }
+        } catch (error) {
+          console.error('Enemy select error:', error);
+          document.getElementById('errorOutput').textContent = "Failed to select enemy marker.";
         }
       });
 
