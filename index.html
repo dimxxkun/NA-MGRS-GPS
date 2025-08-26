@@ -659,22 +659,27 @@
             lastUserLocation = { lat, lon };
             shouldUpdateDropdown = true;
             const geoidHeight = getGeoidHeight(lat, lon);
-            if (geoidHeight !== null) {
+            if (geoidHeight !== null && altitude !== null) {
               correctedAltitude = altitude - geoidHeight;
             } else {
               correctedAltitude = null;
               document.getElementById('errorOutput').textContent = "Geoid height unavailable.";
             }
-            const elevation = await getTerrainElevation(lat, lon);
-            if (elevation !== null && correctedAltitude !== null) {
-              agl = correctedAltitude - elevation;
-              if (agl < 0) {
-                console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
-                agl = 0;
-                document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
+            try {
+              const elevation = await getTerrainElevation(lat, lon);
+              if (elevation !== null && correctedAltitude !== null) {
+                agl = correctedAltitude - elevation;
+                if (agl < 0) {
+                  console.warn(`Negative AGL detected: altitude=${altitude}, geoidHeight=${geoidHeight}, elevation=${elevation}, correctedAltitude=${correctedAltitude}, agl=${agl}`);
+                  agl = 0;
+                  document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
+                }
+              } else {
+                document.getElementById('errorOutput').textContent = "Terrain elevation or altitude unavailable.";
               }
-            } else {
-              document.getElementById('errorOutput').textContent = "Terrain elevation unavailable.";
+            } catch (error) {
+              console.error('Error fetching elevation:', error);
+              document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation.";
             }
             console.log('GPS update:', { lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
           }
@@ -858,7 +863,6 @@
         if (selectedId) {
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
-            // Update output with enemy coordinates only, not current GPS location
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
           } else {
