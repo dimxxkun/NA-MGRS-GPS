@@ -362,17 +362,122 @@
         { "Labels": esriLabels }
       ).addTo(map);
 
+      // Custom geocoder to handle coordinates and place names
+      const customGeocoder = {
+        name: 'CustomGeocoder',
+        geocode: function(query, cb, context) {
+          console.log('Geocoding query:', query);
+          query = query.trim();
+
+          // Helper function to return results
+          const returnResults = (lat, lon, name) => {
+            cb.call(context, [{
+              center: L.latLng(lat, lon),
+              name: name || `Coordinates: ${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+              bbox: L.latLngBounds([lat, lon], [lat, lon])
+            }]);
+          };
+
+          // Parse MGRS
+          const parseMGRS = (input) => {
+            try {
+              const ll = proj4.mgrs.toPoint(input.replace(/\s+/g, '')); // Remove spaces
+              return { lat: ll[1], lon: ll[0] };
+            } catch (e) {
+              console.error('Invalid MGRS:', input, e);
+              return null;
+            }
+          };
+
+          // Parse UTM
+          const parseUTM = (input) => {
+            const utmRegex = /^(\d{1,2})([A-Z])\s*(\d+\.?\d*)\s*([mM]?)\s*E\s*,?\s*(\d+\.?\d*)\s*([mM]?)\s*N$/i;
+            const match = input.match(utmRegex);
+            if (match) {
+              const zone = parseInt(match[1]);
+              const hem = match[2].toUpperCase();
+              const easting = parseFloat(match[3]);
+              const northing = parseFloat(match[5]);
+              try {
+                const utmProj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`;
+                const [lon, lat] = proj4(utmProj, 'WGS84', [easting, northing]);
+                return { lat, lon };
+              } catch (e) {
+                console.error('Invalid UTM:', input, e);
+                return null;
+              }
+            }
+            return null;
+          };
+
+          // Parse Decimal Degrees (DD)
+          const parseDD = (input) => {
+            const ddRegex = /^(-?\d+\.?\d*)\s*[,;]?\s*(-?\d+\.?\d*)$/;
+            const match = input.match(ddRegex);
+            if (match) {
+              const lat = parseFloat(match[1]);
+              const lon = parseFloat(match[2]);
+              if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                return { lat, lon };
+              }
+            }
+            return null;
+          };
+
+          // Parse DMS
+          const parseDMS = (input) => {
+            const dmsRegex = /^(\d+)°\s*(\d+)'\s*(\d+\.?\d*)"\s*([NS])\s*[,;]?\s*(\d+)°\s*(\d+)'\s*(\d+\.?\d*)"\s*([EW])$/i;
+            const match = input.match(dmsRegex);
+            if (match) {
+              const latDeg = parseInt(match[1]);
+              const latMin = parseInt(match[2]);
+              const latSec = parseFloat(match[3]);
+              const latDir = match[4].toUpperCase();
+              const lonDeg = parseInt(match[5]);
+              const lonMin = parseInt(match[6]);
+              const lonSec = parseFloat(match[7]);
+              const lonDir = match[8].toUpperCase();
+
+              const lat = (latDeg + latMin / 60 + latSec / 3600) * (latDir === 'N' ? 1 : -1);
+              const lon = (lonDeg + lonMin / 60 + lonSec / 3600) * (lonDir === 'E' ? 1 : -1);
+
+              if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                return { lat, lon };
+              }
+            }
+            return null;
+          };
+
+          // Try parsing as coordinates first
+          let coords = parseMGRS(query);
+          if (coords) return returnResults(coords.lat, coords.lon, `MGRS: ${query}`);
+
+          coords = parseUTM(query);
+          if (coords) return returnResults(coords.lat, coords.lon, `UTM: ${query}`);
+
+          coords = parseDD(query);
+          if (coords) return returnResults(coords.lat, coords.lon, `DD: ${query}`);
+
+          coords = parseDMS(query);
+          if (coords) return returnResults(coords.lat, coords.lon, `DMS: ${query}`);
+
+          // Fallback to Nominatim for place names
+          L.Control.Geocoder.nominatim().geocode(query, cb, context);
+        }
+      };
+
       // Add Search Control
       L.Control.geocoder({
         defaultMarkGeocode: false,
-        placeholder: 'Search for a location...',
-        geocoder: L.Control.Geocoder.nominatim(),
+        placeholder: 'Search by name, MGRS, UTM, DD, or DMS...',
+        geocoder: customGeocoder,
         position: 'topright'
       }).on('markgeocode', function(e) {
-        console.log('Search result selected:', e.geocode.center);
+        console.log('Search result selected:', e.geocode);
         const latlng = e.geocode.center;
         map.flyTo(latlng, 12);
         updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
+        document.getElementById('statusOutput').textContent = `Located: ${e.geocode.name}`;
       }).addTo(map);
 
       // Handle tile loading errors
