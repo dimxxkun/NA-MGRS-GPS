@@ -896,11 +896,15 @@
         lastUserLocation = null;
         updateEnemyDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        statusOutput.textContent = "";
       });
 
       centerBtn.addEventListener('click', () => {
         console.log('Center button clicked');
-        if (gpsMarker) map.flyTo(gpsMarker.getLatLng(), 15);
+        if (gpsMarker) {
+          map.flyTo(gpsMarker.getLatLng(), 15);
+          statusOutput.textContent = isTracking ? "Tracking Active" : "";
+        }
       });
 
       exportBtnIn.addEventListener('click', exportCoordinates);
@@ -970,13 +974,16 @@
           if (selectedMarker) {
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
+            statusOutput.textContent = `Located: Enemy ${selectedId}`;
           } else {
             console.error('Selected marker not found:', selectedId);
             document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
+            statusOutput.textContent = "";
           }
         } else {
           console.log('No enemy selected, clearing outputs');
           ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+          statusOutput.textContent = isTracking ? "Tracking Active" : "";
         }
       });
 
