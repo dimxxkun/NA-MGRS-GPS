@@ -974,7 +974,30 @@
           if (selectedMarker) {
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
             map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
-            statusOutput.textContent = `Located: Enemy ${selectedId}`;
+            // Perform reverse geocoding to get place name
+            try {
+              L.Control.Geocoder.nominatim().reverse(
+                L.latLng(selectedMarker.lat, selectedMarker.lon),
+                map.getZoom(),
+                (result) => {
+                  if (result && result.name) {
+                    statusOutput.textContent = `Located: ${result.name}`;
+                  } else {
+                    statusOutput.textContent = `Located: Enemy ${selectedId}`;
+                    console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
+                  }
+                },
+                (error) => {
+                  console.error('Reverse geocoding error:', error);
+                  statusOutput.textContent = `Located: Enemy ${selectedId}`;
+                  errorOutput.textContent = "Failed to fetch place name.";
+                }
+              );
+            } catch (error) {
+              console.error('Reverse geocoding failed:', error);
+              statusOutput.textContent = `Located: Enemy ${selectedId}`;
+              errorOutput.textContent = "Failed to fetch place name.";
+            }
           } else {
             console.error('Selected marker not found:', selectedId);
             document.getElementById('errorOutput').textContent = "Selected enemy marker not found.";
