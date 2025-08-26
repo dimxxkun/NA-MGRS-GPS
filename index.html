@@ -507,9 +507,12 @@
       let enemyMarkers = [];
       let currentUserLocation = null;
       let lastUserLocation = null;
+      let lastValidAltitude = null;
+      let lastValidAGL = null;
       let isDropdownOpen = false;
       let distanceUnit = 'km'; // Default to kilometers
       let lastDropdownUpdate = 0;
+      let lastGpsUpdate = 0;
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -578,19 +581,24 @@
         return distance;
       }
 
-      // Check if location has changed significantly (more than 10 meters)
+      // Check if location has changed significantly (more than 10 meters or 5 seconds elapsed)
       function hasLocationChanged(newLat, newLon, oldLat, oldLon) {
-        if (!oldLat || !oldLon) return true;
+        const now = Date.now();
+        if (!oldLat || !oldLon) {
+          console.log('No previous location, allowing update');
+          return true;
+        }
+        const timeElapsed = now - lastGpsUpdate;
         const distance = calculateDistance(newLat, newLon, oldLat, oldLon) * (distanceUnit === 'km' ? 1000 : 1609.34); // Convert to meters
-        console.log('Location change check:', { newLat, newLon, oldLat, oldLon, distance, significant: distance > 10 });
-        return distance > 10;
+        const isSignificant = distance > 10 || timeElapsed > 5000; // 10 meters or 5 seconds
+        console.log('Location change check:', { newLat, newLon, oldLat, oldLon, distance, timeElapsed, isSignificant });
+        return isSignificant;
       }
 
       // Geoid height lookup for Nigeria (simplified)
       function getGeoidHeight(lat, lon) {
         console.log('Calculating geoid height for:', { lat, lon });
         try {
-          // Simplified geoid height model for Nigeria (EGM96 approximation)
           if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
             if (lat < 7) return 20; // Southern Nigeria
             else if (lat < 10) return 25; // Central Nigeria
@@ -605,8 +613,16 @@
         }
       }
 
+      // Cache for elevation data to reduce API calls
+      const elevationCache = new Map();
+      
       // Fetch terrain elevation from Open-Elevation API with retry logic
-      async function getTerrainElevation(lat, lon, retries = 2, delay = 1000) {
+      async function getTerrainElevation(lat, lon, retries = 2, delay = 2000) {
+        const cacheKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+        if (elevationCache.has(cacheKey)) {
+          console.log('Returning cached elevation:', elevationCache.get(cacheKey));
+          return elevationCache.get(cacheKey);
+        }
         console.log('Fetching terrain elevation for:', { lat, lon, retries });
         try {
           const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
@@ -615,8 +631,10 @@
           }
           const data = await response.json();
           if (data.results && data.results[0] && data.results[0].elevation !== undefined) {
-            console.log('Elevation data received:', data.results[0].elevation);
-            return data.results[0].elevation;
+            const elevation = data.results[0].elevation;
+            console.log('Elevation data received:', elevation);
+            elevationCache.set(cacheKey, elevation);
+            return elevation;
           }
           throw new Error("Invalid elevation data");
         } catch (error) {
@@ -626,11 +644,10 @@
             await new Promise(resolve => setTimeout(resolve, delay));
             return getTerrainElevation(lat, lon, retries - 1, delay * 2);
           }
-          // Fallback values for Nigeria
           console.log('Using fallback elevation for:', { lat, lon });
-          if (lat < 7) return 100; // Southern Nigeria
-          else if (lat < 10) return 400; // Central Nigeria
-          else return 300; // Northern Nigeria
+          const fallback = lat < 7 ? 100 : lat < 10 ? 400 : 300; // Southern, Central, Northern Nigeria
+          elevationCache.set(cacheKey, fallback);
+          return fallback;
         }
       }
 
@@ -772,8 +789,8 @@
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
-        let correctedAltitude = null;
-        let agl = null;
+        let correctedAltitude = lastValidAltitude;
+        let agl = lastValidAGL;
         let distance = "N/A";
         let shouldUpdateDropdown = false;
 
@@ -781,6 +798,7 @@
           if (!lastUserLocation || hasLocationChanged(lat, lon, lastUserLocation.lat, lastUserLocation.lon)) {
             currentUserLocation = { lat, lon };
             lastUserLocation = { lat, lon };
+            lastGpsUpdate = Date.now();
             shouldUpdateDropdown = true;
 
             if (altitude !== null && altitude !== undefined) {
@@ -789,6 +807,7 @@
               if (geoidHeight !== null) {
                 correctedAltitude = altitude - geoidHeight;
                 console.log('Corrected altitude:', correctedAltitude);
+                lastValidAltitude = correctedAltitude;
 
                 try {
                   const elevation = await getTerrainElevation(lat, lon);
@@ -801,6 +820,7 @@
                       document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m.";
                       agl = 0;
                     }
+                    lastValidAGL = agl;
                   } else {
                     console.error('Terrain elevation is null');
                     document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation.";
@@ -817,12 +837,17 @@
               console.warn('Altitude not available from GPS');
               document.getElementById('errorOutput').textContent = "GPS altitude data not available.";
             }
+          } else {
+            console.log('Skipping GPS update: location change not significant');
+            return; // Skip updating if location hasn't changed significantly
           }
         } else if (id) {
           if (currentUserLocation) {
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
           }
           shouldUpdateDropdown = true;
+          correctedAltitude = null; // Reset for non-GPS updates
+          agl = null;
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -856,12 +881,29 @@
         }
       }
 
+      // Throttle function for GPS updates
+      function throttle(func, wait) {
+        let lastCall = 0;
+        return function (...args) {
+          const now = Date.now();
+          if (now - lastCall >= wait) {
+            lastCall = now;
+            return func(...args);
+          }
+          console.log('Throttled GPS update, time since last call:', now - lastCall);
+        };
+      }
+
+      const throttledUpdateCoordinates = throttle(async (lat, lon, accuracy, altitude, altitudeAccuracy, isGps) => {
+        await updateCoordinates(lat, lon, accuracy, altitude, altitudeAccuracy, isGps);
+      }, 5000); // Throttle to every 5 seconds
+
       function startTracking() {
         console.log('Starting GPS tracking');
         watchId = navigator.geolocation.watchPosition(
           async pos => {
             console.log('GPS position received:', pos.coords);
-            await updateCoordinates(
+            await throttledUpdateCoordinates(
               pos.coords.latitude,
               pos.coords.longitude,
               pos.coords.accuracy,
@@ -948,6 +990,8 @@
         localStorage.removeItem('enemyMarkers');
         currentUserLocation = null;
         lastUserLocation = null;
+        lastValidAltitude = null;
+        lastValidAGL = null;
         updateEnemyDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         statusOutput.textContent = "";
