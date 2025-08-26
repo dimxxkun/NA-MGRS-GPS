@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PF - GEOTRACE</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha512-Zcn6bjR/8+unxC94EkbB9dR7a52aUaxZ8U0ye/pFDLmo56D2h3eTkbY3A3zTLGvgX2h2nF6A/bGdnX93nPSr6uw==" crossorigin="anonymous" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" integrity="sha512-z2H1O4z5f02k06n0V+9iLLX2Iz0S1lL3w0uHo0wSOKLJDashW9r5gR8DpkM47NCFmJGY5A5P9Q3bH3q0k2cPO0A==" crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     body {
@@ -336,10 +336,10 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha512-+M0P0XzFND+sd2AVo0qQ/j5kOaFs3ErsV4H6ZJzf+Dh6K2KX8/dk/5jU+2/thvE0K96HLc6TfkaNoS1S0sV0V9Q==" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js" integrity="sha512-XG4f/yBC7ThxJebV+2S4ih6E+J2S5nDTOU6Y4q3OwqHSLcT1qU4qS2tW0b2B6fYA3o8CH2Xh/h0N4lBO0oBmz1w==" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
   <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
-  <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js" integrity="sha512-5bYu7V5yKpvV/7yIWveQ5gF7b0X/sfrp2vT8W1D0tOdkSZmG2f+MC0vXUoE9y8o0SJDy0b+v9r69E7T2YqG7sAQ==" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('DOM loaded, initializing map and controls');
@@ -868,8 +868,8 @@
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
           if (isFirstFix) {
             const maxZoom = getCurrentBasemapMaxZoom();
-            console.log('First fix zoom:', { lat, lon, zoomLevel: maxZoom, maxZoom });
-            map.flyTo([lat, lon], maxZoom); // Zoom to max
+            console.log('First fix zoom:', { lat, lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
+            map.flyTo([lat, lon], Math.min(15, maxZoom));
             isFirstFix = false;
           }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
