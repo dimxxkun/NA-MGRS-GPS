@@ -379,13 +379,11 @@
         { "Labels": esriLabels }
       ).addTo(map);
 
-      // Helper function to get current basemap maxZoom
       function getCurrentBasemapMaxZoom() {
         const activeLayer = Object.keys(layerControl._layers).find(key => map.hasLayer(layerControl._layers[key].layer));
         return layerControl._layers[activeLayer]?.layer?.options?.maxZoom || 18;
       }
 
-      // Custom geocoder to handle coordinates and place names
       const customGeocoder = {
         name: 'CustomGeocoder',
         geocode: function(query, cb, context) {
@@ -496,7 +494,6 @@
         document.getElementById('statusOutput').textContent = `Located: ${e.geocode.name}`;
       }).addTo(map);
 
-      // Handle tile loading errors
       esriSatellite.on('tileerror', () => {
         document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
       });
@@ -797,7 +794,6 @@
         }
       }
 
-      // Bearing calculation function
       function calculateBearing(lat1, lon1, lat2, lon2) {
         console.log('Calculating bearing:', { lat1, lon1, lat2, lon2 });
         const toRadians = deg => deg * Math.PI / 180;
@@ -811,23 +807,22 @@
         const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
                   Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
         let bearing = toDegrees(Math.atan2(y, x));
-        bearing = (bearing + 360) % 360; // Normalize to 0-360
-        const mils = bearing * 17.7778; // Convert to mils
+        bearing = (bearing + 360) % 360;
+        const mils = bearing * 17.7778;
 
         return { degrees: bearing, mils };
       }
 
-      // Simplified magnetic declination model
       function getMagneticDeclination(lat, lon) {
         console.log('Estimating magnetic declination for:', { lat, lon });
-        const declination = lon * 0.1; // Placeholder: Replace with NOAA API or model
+        const declination = lon * 0.1;
         return declination;
       }
 
-      // Update bearing outputs and draw line
       function updateBearingOutput(sourceLat, sourceLon, targetLat, targetLon) {
         console.log('Updating bearing output:', { sourceLat, sourceLon, targetLat, targetLon });
         if (!sourceLat || !sourceLon || !targetLat || !targetLon) {
+          console.log('Invalid bearing coordinates, setting to N/A');
           document.getElementById('bearingTrueOutput').textContent = 'N/A';
           document.getElementById('bearingMagneticOutput').textContent = 'N/A';
           document.getElementById('bearingMilsOutput').textContent = 'N/A';
@@ -835,7 +830,7 @@
             map.removeLayer(bearingLine);
             bearingLine = null;
           }
-          return;
+          return false;
         }
 
         const { degrees, mils } = calculateBearing(sourceLat, sourceLon, targetLat, targetLon);
@@ -857,6 +852,7 @@
         }).addTo(map);
 
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+        return true;
       }
 
       async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
@@ -913,6 +909,12 @@
               console.warn('Altitude not available from GPS');
               document.getElementById('errorOutput').textContent = "GPS altitude data not available.";
             }
+
+            if (bearingMode && bearingTarget) {
+              console.log('Updating bearing due to GPS update');
+              bearingSource = { lat, lon };
+              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
+            }
           } else {
             console.log('Skipping GPS update: location change not significant');
             return;
@@ -924,6 +926,15 @@
           shouldUpdateDropdown = true;
           correctedAltitude = null;
           agl = null;
+          if (bearingMode) {
+            bearingTarget = { lat, lon };
+            if (!bearingSource && currentUserLocation) {
+              bearingSource = { lat: currentUserLocation.lat, lon: currentUserLocation.lon };
+            }
+            if (bearingSource) {
+              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
+            }
+          }
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -944,10 +955,6 @@
             console.log('First fix zoom:', { lat, lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
             map.flyTo([lat, lon], Math.min(15, maxZoom));
             isFirstFix = false;
-          }
-          if (bearingMode && bearingSource && bearingTarget) {
-            bearingSource = { lat, lon };
-            updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
           }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
           enemyCounter = Math.max(enemyCounter, id);
@@ -1016,7 +1023,7 @@
         isFirstFix = true;
         getLocationBtn.textContent = "Start Tracking Location";
         if (!map.hasLayer(esriTerrain)) {
-          statusOutput.textContent = "";
+          statusOutput.textContent = bearingMode ? "Select bearing source and target" : "";
         }
       }
 
@@ -1076,13 +1083,15 @@
         lastUserLocation = null;
         lastValidAltitude = null;
         lastValidAGL = null;
+        bearingSource = null;
+        bearingTarget = null;
         updateEnemyDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingTrueOutput","bearingMagneticOutput","bearingMilsOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
-        statusOutput.textContent = "";
         if (bearingLine) {
           map.removeLayer(bearingLine);
           bearingLine = null;
         }
+        statusOutput.textContent = isTracking ? "Tracking Active" : "";
       });
 
       centerBtn.addEventListener('click', () => {
@@ -1092,6 +1101,8 @@
           console.log('Centering map:', { latlng: gpsMarker.getLatLng(), zoomLevel: Math.min(15, maxZoom), maxZoom });
           map.flyTo(gpsMarker.getLatLng(), Math.min(15, maxZoom));
           statusOutput.textContent = isTracking ? "Tracking Active" : "";
+        } else {
+          errorOutput.textContent = "No current location available. Start tracking first.";
         }
       });
 
@@ -1111,6 +1122,11 @@
               selectedMarker.lat,
               selectedMarker.lon
             ).toFixed(2) + ` ${distanceUnit}`;
+            if (bearingMode) {
+              bearingTarget = { lat: selectedMarker.lat, lon: selectedMarker.lon };
+              bearingSource = { lat: currentUserLocation.lat, lon: currentUserLocation.lon };
+              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
+            }
           }
         }
       });
@@ -1132,7 +1148,8 @@
           updateBearingOutput(null, null, null, null);
           statusOutput.textContent = isTracking ? 'Tracking Active' : '';
         } else {
-          statusOutput.textContent = 'Click map to set bearing target or select enemy';
+          bearingSource = currentUserLocation ? { lat: currentUserLocation.lat, lon: currentUserLocation.lon } : null;
+          statusOutput.textContent = bearingSource ? 'Select target (click map or enemy)' : 'Click map to set source point';
         }
       });
 
@@ -1140,12 +1157,16 @@
         if (bearingMode) {
           console.log('Map clicked in bearing mode:', e.latlng);
           if (!bearingSource) {
-            bearingSource = { lat: currentUserLocation?.lat || e.latlng.lat, lon: currentUserLocation?.lon || e.latlng.lng };
-            statusOutput.textContent = 'Click map again to set bearing target or select enemy';
+            bearingSource = { lat: e.latlng.lat, lon: e.latlng.lng };
+            statusOutput.textContent = 'Click map or select enemy to set target';
+            errorOutput.textContent = '';
           } else {
             bearingTarget = { lat: e.latlng.lat, lon: e.latlng.lng };
-            updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
-            statusOutput.textContent = 'Bearing calculated';
+            if (updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon)) {
+              statusOutput.textContent = 'Bearing calculated';
+            } else {
+              errorOutput.textContent = 'Invalid coordinates for bearing calculation';
+            }
           }
         }
       });
@@ -1204,9 +1225,16 @@
             map.flyTo([selectedMarker.lat, selectedMarker.lon], Math.min(15, maxZoom));
             if (bearingMode) {
               bearingTarget = { lat: selectedMarker.lat, lon: selectedMarker.lon };
-              bearingSource = bearingSource || currentUserLocation || { lat: selectedMarker.lat, lon: selectedMarker.lon };
-              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
-              statusOutput.textContent = `Bearing to Enemy ${selectedId}`;
+              bearingSource = bearingSource || (currentUserLocation ? { lat: currentUserLocation.lat, lon: currentUserLocation.lon } : null);
+              if (bearingSource && bearingTarget) {
+                if (updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon)) {
+                  statusOutput.textContent = `Bearing to Enemy ${selectedId}`;
+                } else {
+                  errorOutput.textContent = 'Invalid coordinates for bearing calculation';
+                }
+              } else {
+                errorOutput.textContent = 'Select source point or enable tracking for bearing';
+              }
             } else {
               try {
                 L.Control.Geocoder.nominatim().reverse(
@@ -1240,7 +1268,11 @@
         } else {
           console.log('No enemy selected, clearing outputs');
           ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingTrueOutput","bearingMagneticOutput","bearingMilsOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
-          statusOutput.textContent = isTracking ? "Tracking Active" : "";
+          if (bearingMode) {
+            bearingTarget = null;
+            updateBearingOutput(null, null, null, null);
+          }
+          statusOutput.textContent = isTracking ? "Tracking Active" : bearingMode ? "Select bearing source and target" : "";
         }
       });
 
