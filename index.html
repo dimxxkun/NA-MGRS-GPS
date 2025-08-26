@@ -405,7 +405,6 @@
       let isDropdownOpen = false;
       let distanceUnit = 'km'; // Default to kilometers
       let lastDropdownUpdate = 0;
-      let lastKnownAGL = null; // Store last known AGL value
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -495,20 +494,8 @@
         }
       }
 
-      // Debounced fetch terrain elevation from Open-Elevation API or fallback
-      function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-          const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-          };
-          clearTimeout(timeout);
-          timeout = setTimeout(later, wait);
-        };
-      }
-
-      const getTerrainElevation = debounce(async (lat, lon) => {
+      // Fetch terrain elevation from Open-Elevation API or fallback
+      async function getTerrainElevation(lat, lon) {
         try {
           const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lon}`);
           const data = await response.json();
@@ -522,7 +509,7 @@
           else if (lat < 10) return 400;
           else return 300;
         }
-      }, 1000);
+      }
 
       function loadEnemyMarkers() {
         console.log('Loading enemy markers from localStorage');
@@ -555,6 +542,18 @@
       }
 
       // Debounced updateEnemyDropdown
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+
       const updateEnemyDropdown = debounce((selectedId = null) => {
         console.log('Updating dropdown, selectedId:', selectedId, 'isDropdownOpen:', isDropdownOpen);
         if (isDropdownOpen) {
@@ -650,7 +649,7 @@
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
 
         let correctedAltitude = altitude;
-        let agl = lastKnownAGL; // Preserve last known AGL unless updated
+        let agl = null;
         let distance = "N/A";
         let shouldUpdateDropdown = false;
 
@@ -675,15 +674,12 @@
                   agl = 0;
                   document.getElementById('errorOutput').textContent = "Warning: Negative AGL detected, set to 0m. Check GPS altitude or elevation data.";
                 }
-                lastKnownAGL = agl; // Update last known AGL
               } else {
                 document.getElementById('errorOutput').textContent = "Terrain elevation or altitude unavailable.";
-                agl = null; // Reset only if elevation fetch fails
               }
             } catch (error) {
               console.error('Error fetching elevation:', error);
               document.getElementById('errorOutput').textContent = "Failed to fetch terrain elevation.";
-              agl = null; // Reset only if elevation fetch fails
             }
             console.log('GPS update:', { lat, lon, altitude, geoidHeight, elevation, correctedAltitude, agl });
           }
@@ -692,10 +688,6 @@
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
           }
           shouldUpdateDropdown = true;
-          // Do not reset AGL for non-GPS updates
-          agl = lastKnownAGL || "N/A";
-          correctedAltitude = "N/A";
-          accuracy = "N/A";
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -703,7 +695,7 @@
         document.getElementById('dmsOutput').textContent = toDMS(lat, lon);
         document.getElementById('utmOutput').textContent = toUTM(lat, lon);
         document.getElementById('altitudeOutput').textContent = isGps && correctedAltitude !== null ? `${correctedAltitude.toFixed(1)}m ±${altitudeAccuracy?.toFixed(1) || 'N/A'}m` : "N/A";
-        document.getElementById('aglOutput').textContent = agl !== null ? `${agl.toFixed(1)}m` : "N/A";
+        document.getElementById('aglOutput').textContent = isGps && agl !== null ? `${agl.toFixed(1)}m` : "N/A";
         document.getElementById('distanceOutput').textContent = distance;
         document.getElementById('accuracyOutput').textContent = isGps && accuracy ? `±${accuracy.toFixed(1)}m` : "N/A";
         document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
@@ -797,7 +789,6 @@
         localStorage.removeItem('enemyMarkers');
         currentUserLocation = null;
         lastUserLocation = null;
-        lastKnownAGL = null; // Reset AGL on clear
         updateEnemyDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
       });
@@ -880,8 +871,7 @@
           }
         } else {
           console.log('No enemy selected, clearing outputs');
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
-          document.getElementById('aglOutput').textContent = lastKnownAGL !== null ? `${lastKnownAGL.toFixed(1)}m` : "N/A";
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         }
       });
 
