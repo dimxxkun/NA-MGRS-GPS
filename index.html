@@ -85,14 +85,11 @@
     #selectEnemyBtn:hover, #clearEnemyBtn:hover {
       background: linear-gradient(135deg, #c00, #a00);
     }
-    #toggleUnitsBtn, #bearingBtn {
+    #toggleUnitsBtn {
       background: linear-gradient(135deg, #0288d1, #01579b);
     }
-    #toggleUnitsBtn:hover, #bearingBtn:hover {
+    #toggleUnitsBtn:hover {
       background: linear-gradient(135deg, #4fc3f7, #0288d1);
-    }
-    #bearingBtn.active {
-      background: linear-gradient(135deg, #2e7d32, #1b5e20);
     }
     .dropdown {
       margin-bottom: 20px;
@@ -314,7 +311,6 @@
         <button id="centerBtn" aria-label="Center map on current location">Center on Me</button>
         <button id="exportBtnIn" aria-label="Export enemy coordinates">Export Coordinates</button>
         <button id="toggleUnitsBtn" aria-label="Toggle distance units">Toggle Units (km/mi)</button>
-        <button id="bearingBtn" aria-label="Calculate bearing">Calculate Bearing</button>
       </div>
       <div class="dropdown">
         <label for="enemySelect">Select Enemy Marker:</label>
@@ -331,9 +327,6 @@
         <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">Copy</button></div>
         <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">Copy</button></div>
         <div class="coord-line"><strong>Distance:</strong> <span id="distanceOutput">N/A</span> <button class="copy-btn" data-target="distanceOutput" aria-label="Copy Distance">Copy</button></div>
-        <div class="coord-line"><strong>Bearing (True):</strong> <span id="bearingTrueOutput">N/A</span> <button class="copy-btn" data-target="bearingTrueOutput" aria-label="Copy True Bearing">Copy</button></div>
-        <div class="coord-line"><strong>Bearing (Magnetic):</strong> <span id="bearingMagneticOutput">N/A</span> <button class="copy-btn" data-target="bearingMagneticOutput" aria-label="Copy Magnetic Bearing">Copy</button></div>
-        <div class="coord-line"><strong>Bearing (Mils):</strong> <span id="bearingMilsOutput">N/A</span> <button class="copy-btn" data-target="bearingMilsOutput" aria-label="Copy Mils Bearing">Copy</button></div>
         <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
         <div class="coord-line"><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></div>
         <button class="copy-all-btn" id="copyAllBtn" aria-label="Copy all coordinates">Copy All Coordinates</button>
@@ -345,6 +338,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -379,11 +373,13 @@
         { "Labels": esriLabels }
       ).addTo(map);
 
+      // Helper function to get current basemap maxZoom
       function getCurrentBasemapMaxZoom() {
         const activeLayer = Object.keys(layerControl._layers).find(key => map.hasLayer(layerControl._layers[key].layer));
         return layerControl._layers[activeLayer]?.layer?.options?.maxZoom || 18;
       }
 
+      // Custom geocoder to handle coordinates and place names
       const customGeocoder = {
         name: 'CustomGeocoder',
         geocode: function(query, cb, context) {
@@ -494,6 +490,7 @@
         document.getElementById('statusOutput').textContent = `Located: ${e.geocode.name}`;
       }).addTo(map);
 
+      // Handle tile loading errors
       esriSatellite.on('tileerror', () => {
         document.getElementById('errorOutput').textContent = "Failed to load map tiles. Check your internet connection.";
       });
@@ -526,10 +523,6 @@
       let distanceUnit = 'km';
       let lastDropdownUpdate = 0;
       let lastGpsUpdate = 0;
-      let bearingMode = false;
-      let bearingLine = null;
-      let bearingSource = null;
-      let bearingTarget = null;
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -555,7 +548,6 @@
       const centerBtn = document.getElementById('centerBtn');
       const exportBtnIn = document.getElementById('exportBtnIn');
       const toggleUnitsBtn = document.getElementById('toggleUnitsBtn');
-      const bearingBtn = document.getElementById('bearingBtn');
       const enemySelect = document.getElementById('enemySelect');
       const errorOutput = document.getElementById('errorOutput');
       const statusOutput = document.getElementById('statusOutput');
@@ -794,67 +786,6 @@
         }
       }
 
-      function calculateBearing(lat1, lon1, lat2, lon2) {
-        console.log('Calculating bearing:', { lat1, lon1, lat2, lon2 });
-        const toRadians = deg => deg * Math.PI / 180;
-        const toDegrees = rad => rad * 180 / Math.PI;
-
-        const dLon = toRadians(lon2 - lon1);
-        const lat1Rad = toRadians(lat1);
-        const lat2Rad = toRadians(lat2);
-
-        const y = Math.sin(dLon) * Math.cos(lat2Rad);
-        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
-                  Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-        let bearing = toDegrees(Math.atan2(y, x));
-        bearing = (bearing + 360) % 360;
-        const mils = bearing * 17.7778;
-
-        return { degrees: bearing, mils };
-      }
-
-      function getMagneticDeclination(lat, lon) {
-        console.log('Estimating magnetic declination for:', { lat, lon });
-        const declination = lon * 0.1;
-        return declination;
-      }
-
-      function updateBearingOutput(sourceLat, sourceLon, targetLat, targetLon) {
-        console.log('Updating bearing output:', { sourceLat, sourceLon, targetLat, targetLon });
-        if (!sourceLat || !sourceLon || !targetLat || !targetLon) {
-          console.log('Invalid bearing coordinates, setting to N/A');
-          document.getElementById('bearingTrueOutput').textContent = 'N/A';
-          document.getElementById('bearingMagneticOutput').textContent = 'N/A';
-          document.getElementById('bearingMilsOutput').textContent = 'N/A';
-          if (bearingLine) {
-            map.removeLayer(bearingLine);
-            bearingLine = null;
-          }
-          return false;
-        }
-
-        const { degrees, mils } = calculateBearing(sourceLat, sourceLon, targetLat, targetLon);
-        const declination = getMagneticDeclination(sourceLat, sourceLon);
-        const magneticBearing = (degrees + declination + 360) % 360;
-
-        document.getElementById('bearingTrueOutput').textContent = `${degrees.toFixed(1)}°`;
-        document.getElementById('bearingMagneticOutput').textContent = `${magneticBearing.toFixed(1)}°`;
-        document.getElementById('bearingMilsOutput').textContent = `${mils.toFixed(0)} mils`;
-
-        if (bearingLine) map.removeLayer(bearingLine);
-        bearingLine = L.polyline([
-          [sourceLat, sourceLon],
-          [targetLat, targetLon]
-        ], {
-          color: '#ff4444',
-          weight: 3,
-          dashArray: '5, 10'
-        }).addTo(map);
-
-        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
-        return true;
-      }
-
       async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
         console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, id });
 
@@ -909,12 +840,6 @@
               console.warn('Altitude not available from GPS');
               document.getElementById('errorOutput').textContent = "GPS altitude data not available.";
             }
-
-            if (bearingMode && bearingTarget) {
-              console.log('Updating bearing due to GPS update');
-              bearingSource = { lat, lon };
-              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
-            }
           } else {
             console.log('Skipping GPS update: location change not significant');
             return;
@@ -926,15 +851,6 @@
           shouldUpdateDropdown = true;
           correctedAltitude = null;
           agl = null;
-          if (bearingMode) {
-            bearingTarget = { lat, lon };
-            if (!bearingSource && currentUserLocation) {
-              bearingSource = { lat: currentUserLocation.lat, lon: currentUserLocation.lon };
-            }
-            if (bearingSource) {
-              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
-            }
-          }
         }
 
         document.getElementById('mgrsOutput').textContent = mgrs;
@@ -1023,7 +939,7 @@
         isFirstFix = true;
         getLocationBtn.textContent = "Start Tracking Location";
         if (!map.hasLayer(esriTerrain)) {
-          statusOutput.textContent = bearingMode ? "Select bearing source and target" : "";
+          statusOutput.textContent = "";
         }
       }
 
@@ -1083,15 +999,9 @@
         lastUserLocation = null;
         lastValidAltitude = null;
         lastValidAGL = null;
-        bearingSource = null;
-        bearingTarget = null;
         updateEnemyDropdown();
-        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingTrueOutput","bearingMagneticOutput","bearingMilsOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
-        if (bearingLine) {
-          map.removeLayer(bearingLine);
-          bearingLine = null;
-        }
-        statusOutput.textContent = isTracking ? "Tracking Active" : "";
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        statusOutput.textContent = "";
       });
 
       centerBtn.addEventListener('click', () => {
@@ -1101,8 +1011,6 @@
           console.log('Centering map:', { latlng: gpsMarker.getLatLng(), zoomLevel: Math.min(15, maxZoom), maxZoom });
           map.flyTo(gpsMarker.getLatLng(), Math.min(15, maxZoom));
           statusOutput.textContent = isTracking ? "Tracking Active" : "";
-        } else {
-          errorOutput.textContent = "No current location available. Start tracking first.";
         }
       });
 
@@ -1122,51 +1030,6 @@
               selectedMarker.lat,
               selectedMarker.lon
             ).toFixed(2) + ` ${distanceUnit}`;
-            if (bearingMode) {
-              bearingTarget = { lat: selectedMarker.lat, lon: selectedMarker.lon };
-              bearingSource = { lat: currentUserLocation.lat, lon: currentUserLocation.lon };
-              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
-            }
-          }
-        }
-      });
-
-      bearingBtn.addEventListener('click', () => {
-        console.log('Bearing button clicked, bearingMode:', bearingMode);
-        bearingMode = !bearingMode;
-        bearingBtn.classList.toggle('active', bearingMode);
-        bearingBtn.textContent = bearingMode ? 'Stop Bearing Mode' : 'Calculate Bearing';
-        map.getContainer().style.cursor = bearingMode ? 'crosshair' : '';
-
-        if (!bearingMode) {
-          if (bearingLine) {
-            map.removeLayer(bearingLine);
-            bearingLine = null;
-          }
-          bearingSource = null;
-          bearingTarget = null;
-          updateBearingOutput(null, null, null, null);
-          statusOutput.textContent = isTracking ? 'Tracking Active' : '';
-        } else {
-          bearingSource = currentUserLocation ? { lat: currentUserLocation.lat, lon: currentUserLocation.lon } : null;
-          statusOutput.textContent = bearingSource ? 'Select target (click map or enemy)' : 'Click map to set source point';
-        }
-      });
-
-      map.on('click', (e) => {
-        if (bearingMode) {
-          console.log('Map clicked in bearing mode:', e.latlng);
-          if (!bearingSource) {
-            bearingSource = { lat: e.latlng.lat, lon: e.latlng.lng };
-            statusOutput.textContent = 'Click map or select enemy to set target';
-            errorOutput.textContent = '';
-          } else {
-            bearingTarget = { lat: e.latlng.lat, lon: e.latlng.lng };
-            if (updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon)) {
-              statusOutput.textContent = 'Bearing calculated';
-            } else {
-              errorOutput.textContent = 'Invalid coordinates for bearing calculation';
-            }
           }
         }
       });
@@ -1196,9 +1059,6 @@
           `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
           `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
           `Distance: ${document.getElementById('distanceOutput').textContent}`,
-          `Bearing (True): ${document.getElementById('bearingTrueOutput').textContent}`,
-          `Bearing (Magnetic): ${document.getElementById('bearingMagneticOutput').textContent}`,
-          `Bearing (Mils): ${document.getElementById('bearingMilsOutput').textContent}`,
           `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
           `Last Updated: ${document.getElementById('timestampOutput').textContent}`
         ].join('\n');
@@ -1223,42 +1083,28 @@
             const maxZoom = getCurrentBasemapMaxZoom();
             console.log('Zooming to enemy marker:', { lat: selectedMarker.lat, lon: selectedMarker.lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
             map.flyTo([selectedMarker.lat, selectedMarker.lon], Math.min(15, maxZoom));
-            if (bearingMode) {
-              bearingTarget = { lat: selectedMarker.lat, lon: selectedMarker.lon };
-              bearingSource = bearingSource || (currentUserLocation ? { lat: currentUserLocation.lat, lon: currentUserLocation.lon } : null);
-              if (bearingSource && bearingTarget) {
-                if (updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon)) {
-                  statusOutput.textContent = `Bearing to Enemy ${selectedId}`;
-                } else {
-                  errorOutput.textContent = 'Invalid coordinates for bearing calculation';
-                }
-              } else {
-                errorOutput.textContent = 'Select source point or enable tracking for bearing';
-              }
-            } else {
-              try {
-                L.Control.Geocoder.nominatim().reverse(
-                  L.latLng(selectedMarker.lat, selectedMarker.lon),
-                  map.getZoom(),
-                  (result) => {
-                    if (result && result.name) {
-                      statusOutput.textContent = `Located: ${result.name}`;
-                    } else {
-                      statusOutput.textContent = `Located: Enemy ${selectedId}`;
-                      console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
-                    }
-                  },
-                  (error) => {
-                    console.error('Reverse geocoding error:', error);
+            try {
+              L.Control.Geocoder.nominatim().reverse(
+                L.latLng(selectedMarker.lat, selectedMarker.lon),
+                map.getZoom(),
+                (result) => {
+                  if (result && result.name) {
+                    statusOutput.textContent = `Located: ${result.name}`;
+                  } else {
                     statusOutput.textContent = `Located: Enemy ${selectedId}`;
-                    errorOutput.textContent = "Failed to fetch place name.";
+                    console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
                   }
-                );
-              } catch (error) {
-                console.error('Reverse geocoding failed:', error);
-                statusOutput.textContent = `Located: Enemy ${selectedId}`;
-                errorOutput.textContent = "Failed to fetch place name.";
-              }
+                },
+                (error) => {
+                  console.error('Reverse geocoding error:', error);
+                  statusOutput.textContent = `Located: Enemy ${selectedId}`;
+                  errorOutput.textContent = "Failed to fetch place name.";
+                }
+              );
+            } catch (error) {
+              console.error('Reverse geocoding failed:', error);
+              statusOutput.textContent = `Located: Enemy ${selectedId}`;
+              errorOutput.textContent = "Failed to fetch place name.";
             }
           } else {
             console.error('Selected marker not found:', selectedId);
@@ -1267,12 +1113,8 @@
           }
         } else {
           console.log('No enemy selected, clearing outputs');
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingTrueOutput","bearingMagneticOutput","bearingMilsOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
-          if (bearingMode) {
-            bearingTarget = null;
-            updateBearingOutput(null, null, null, null);
-          }
-          statusOutput.textContent = isTracking ? "Tracking Active" : bearingMode ? "Select bearing source and target" : "";
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+          statusOutput.textContent = isTracking ? "Tracking Active" : "";
         }
       });
 
