@@ -85,11 +85,14 @@
     #selectEnemyBtn:hover, #clearEnemyBtn:hover {
       background: linear-gradient(135deg, #c00, #a00);
     }
-    #toggleUnitsBtn {
+    #toggleUnitsBtn, #bearingBtn {
       background: linear-gradient(135deg, #0288d1, #01579b);
     }
-    #toggleUnitsBtn:hover {
+    #toggleUnitsBtn:hover, #bearingBtn:hover {
       background: linear-gradient(135deg, #4fc3f7, #0288d1);
+    }
+    #bearingBtn.active {
+      background: linear-gradient(135deg, #2e7d32, #1b5e20);
     }
     .dropdown {
       margin-bottom: 20px;
@@ -311,6 +314,7 @@
         <button id="centerBtn" aria-label="Center map on current location">Center on Me</button>
         <button id="exportBtnIn" aria-label="Export enemy coordinates">Export Coordinates</button>
         <button id="toggleUnitsBtn" aria-label="Toggle distance units">Toggle Units (km/mi)</button>
+        <button id="bearingBtn" aria-label="Calculate bearing">Calculate Bearing</button>
       </div>
       <div class="dropdown">
         <label for="enemySelect">Select Enemy Marker:</label>
@@ -327,6 +331,9 @@
         <div class="coord-line"><strong>Altitude (ASL):</strong> <span id="altitudeOutput">N/A</span> <button class="copy-btn" data-target="altitudeOutput" aria-label="Copy ASL Altitude">Copy</button></div>
         <div class="coord-line"><strong>Height (AGL):</strong> <span id="aglOutput">N/A</span> <button class="copy-btn" data-target="aglOutput" aria-label="Copy AGL Height">Copy</button></div>
         <div class="coord-line"><strong>Distance:</strong> <span id="distanceOutput">N/A</span> <button class="copy-btn" data-target="distanceOutput" aria-label="Copy Distance">Copy</button></div>
+        <div class="coord-line"><strong>Bearing (True):</strong> <span id="bearingTrueOutput">N/A</span> <button class="copy-btn" data-target="bearingTrueOutput" aria-label="Copy True Bearing">Copy</button></div>
+        <div class="coord-line"><strong>Bearing (Magnetic):</strong> <span id="bearingMagneticOutput">N/A</span> <button class="copy-btn" data-target="bearingMagneticOutput" aria-label="Copy Magnetic Bearing">Copy</button></div>
+        <div class="coord-line"><strong>Bearing (Mils):</strong> <span id="bearingMilsOutput">N/A</span> <button class="copy-btn" data-target="bearingMilsOutput" aria-label="Copy Mils Bearing">Copy</button></div>
         <div class="coord-line"><strong>Accuracy:</strong> <span id="accuracyOutput">N/A</span></div>
         <div class="coord-line"><strong>Last Updated:</strong> <span id="timestampOutput">N/A</span></div>
         <button class="copy-all-btn" id="copyAllBtn" aria-label="Copy all coordinates">Copy All Coordinates</button>
@@ -338,7 +345,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
-  <script src="https://unpkg.com/proj4-mgrs@0.1.2/dist/proj4-mgrs.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -523,6 +529,10 @@
       let distanceUnit = 'km';
       let lastDropdownUpdate = 0;
       let lastGpsUpdate = 0;
+      let bearingMode = false;
+      let bearingLine = null;
+      let bearingSource = null;
+      let bearingTarget = null;
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -548,6 +558,7 @@
       const centerBtn = document.getElementById('centerBtn');
       const exportBtnIn = document.getElementById('exportBtnIn');
       const toggleUnitsBtn = document.getElementById('toggleUnitsBtn');
+      const bearingBtn = document.getElementById('bearingBtn');
       const enemySelect = document.getElementById('enemySelect');
       const errorOutput = document.getElementById('errorOutput');
       const statusOutput = document.getElementById('statusOutput');
@@ -786,6 +797,68 @@
         }
       }
 
+      // Bearing calculation function
+      function calculateBearing(lat1, lon1, lat2, lon2) {
+        console.log('Calculating bearing:', { lat1, lon1, lat2, lon2 });
+        const toRadians = deg => deg * Math.PI / 180;
+        const toDegrees = rad => rad * 180 / Math.PI;
+
+        const dLon = toRadians(lon2 - lon1);
+        const lat1Rad = toRadians(lat1);
+        const lat2Rad = toRadians(lat2);
+
+        const y = Math.sin(dLon) * Math.cos(lat2Rad);
+        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+                  Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+        let bearing = toDegrees(Math.atan2(y, x));
+        bearing = (bearing + 360) % 360; // Normalize to 0-360
+        const mils = bearing * 17.7778; // Convert to mils
+
+        return { degrees: bearing, mils };
+      }
+
+      // Simplified magnetic declination model
+      function getMagneticDeclination(lat, lon) {
+        console.log('Estimating magnetic declination for:', { lat, lon });
+        const declination = lon * 0.1; // Placeholder: Replace with NOAA API or model
+        return declination;
+      }
+
+      // Update bearing outputs and draw line
+      function updateBearingOutput(sourceLat, sourceLon, targetLat, targetLon) {
+        console.log('Updating bearing output:', { sourceLat, sourceLon, targetLat, targetLon });
+        if (!sourceLat || !sourceLon || !targetLat || !targetLon) {
+          document.getElementById('bearingTrueOutput').textContent = 'N/A';
+          document.getElementById('bearingMagneticOutput').textContent = 'N/A';
+          document.getElementById('bearingMilsOutput').textContent = 'N/A';
+          if (bearingLine) {
+            map.removeLayer(bearingLine);
+            bearingLine = null;
+          }
+          return;
+        }
+
+        const { degrees, mils } = calculateBearing(sourceLat, sourceLon, targetLat, targetLon);
+        const declination = getMagneticDeclination(sourceLat, sourceLon);
+        const magneticBearing = (degrees + declination + 360) % 360;
+
+        document.getElementById('bearingTrueOutput').textContent = `${degrees.toFixed(1)}°`;
+        document.getElementById('bearingMagneticOutput').textContent = `${magneticBearing.toFixed(1)}°`;
+        document.getElementById('bearingMilsOutput').textContent = `${mils.toFixed(0)} mils`;
+
+        if (bearingLine) map.removeLayer(bearingLine);
+        bearingLine = L.polyline([
+          [sourceLat, sourceLon],
+          [targetLat, targetLon]
+        ], {
+          color: '#ff4444',
+          weight: 3,
+          dashArray: '5, 10'
+        }).addTo(map);
+
+        document.getElementById('timestampOutput').textContent = new Date().toLocaleString();
+      }
+
       async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null) {
         console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, id });
 
@@ -871,6 +944,10 @@
             console.log('First fix zoom:', { lat, lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
             map.flyTo([lat, lon], Math.min(15, maxZoom));
             isFirstFix = false;
+          }
+          if (bearingMode && bearingSource && bearingTarget) {
+            bearingSource = { lat, lon };
+            updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
           }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
           enemyCounter = Math.max(enemyCounter, id);
@@ -1000,8 +1077,12 @@
         lastValidAltitude = null;
         lastValidAGL = null;
         updateEnemyDropdown();
-        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+        ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingTrueOutput","bearingMagneticOutput","bearingMilsOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         statusOutput.textContent = "";
+        if (bearingLine) {
+          map.removeLayer(bearingLine);
+          bearingLine = null;
+        }
       });
 
       centerBtn.addEventListener('click', () => {
@@ -1034,6 +1115,41 @@
         }
       });
 
+      bearingBtn.addEventListener('click', () => {
+        console.log('Bearing button clicked, bearingMode:', bearingMode);
+        bearingMode = !bearingMode;
+        bearingBtn.classList.toggle('active', bearingMode);
+        bearingBtn.textContent = bearingMode ? 'Stop Bearing Mode' : 'Calculate Bearing';
+        map.getContainer().style.cursor = bearingMode ? 'crosshair' : '';
+
+        if (!bearingMode) {
+          if (bearingLine) {
+            map.removeLayer(bearingLine);
+            bearingLine = null;
+          }
+          bearingSource = null;
+          bearingTarget = null;
+          updateBearingOutput(null, null, null, null);
+          statusOutput.textContent = isTracking ? 'Tracking Active' : '';
+        } else {
+          statusOutput.textContent = 'Click map to set bearing target or select enemy';
+        }
+      });
+
+      map.on('click', (e) => {
+        if (bearingMode) {
+          console.log('Map clicked in bearing mode:', e.latlng);
+          if (!bearingSource) {
+            bearingSource = { lat: currentUserLocation?.lat || e.latlng.lat, lon: currentUserLocation?.lon || e.latlng.lng };
+            statusOutput.textContent = 'Click map again to set bearing target or select enemy';
+          } else {
+            bearingTarget = { lat: e.latlng.lat, lon: e.latlng.lng };
+            updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
+            statusOutput.textContent = 'Bearing calculated';
+          }
+        }
+      });
+
       document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           console.log('Copy button clicked for:', btn.dataset.target);
@@ -1059,6 +1175,9 @@
           `Altitude (ASL): ${document.getElementById('altitudeOutput').textContent}`,
           `Height (AGL): ${document.getElementById('aglOutput').textContent}`,
           `Distance: ${document.getElementById('distanceOutput').textContent}`,
+          `Bearing (True): ${document.getElementById('bearingTrueOutput').textContent}`,
+          `Bearing (Magnetic): ${document.getElementById('bearingMagneticOutput').textContent}`,
+          `Bearing (Mils): ${document.getElementById('bearingMilsOutput').textContent}`,
           `Accuracy: ${document.getElementById('accuracyOutput').textContent}`,
           `Last Updated: ${document.getElementById('timestampOutput').textContent}`
         ].join('\n');
@@ -1083,28 +1202,35 @@
             const maxZoom = getCurrentBasemapMaxZoom();
             console.log('Zooming to enemy marker:', { lat: selectedMarker.lat, lon: selectedMarker.lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
             map.flyTo([selectedMarker.lat, selectedMarker.lon], Math.min(15, maxZoom));
-            try {
-              L.Control.Geocoder.nominatim().reverse(
-                L.latLng(selectedMarker.lat, selectedMarker.lon),
-                map.getZoom(),
-                (result) => {
-                  if (result && result.name) {
-                    statusOutput.textContent = `Located: ${result.name}`;
-                  } else {
+            if (bearingMode) {
+              bearingTarget = { lat: selectedMarker.lat, lon: selectedMarker.lon };
+              bearingSource = bearingSource || currentUserLocation || { lat: selectedMarker.lat, lon: selectedMarker.lon };
+              updateBearingOutput(bearingSource.lat, bearingSource.lon, bearingTarget.lat, bearingTarget.lon);
+              statusOutput.textContent = `Bearing to Enemy ${selectedId}`;
+            } else {
+              try {
+                L.Control.Geocoder.nominatim().reverse(
+                  L.latLng(selectedMarker.lat, selectedMarker.lon),
+                  map.getZoom(),
+                  (result) => {
+                    if (result && result.name) {
+                      statusOutput.textContent = `Located: ${result.name}`;
+                    } else {
+                      statusOutput.textContent = `Located: Enemy ${selectedId}`;
+                      console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
+                    }
+                  },
+                  (error) => {
+                    console.error('Reverse geocoding error:', error);
                     statusOutput.textContent = `Located: Enemy ${selectedId}`;
-                    console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
+                    errorOutput.textContent = "Failed to fetch place name.";
                   }
-                },
-                (error) => {
-                  console.error('Reverse geocoding error:', error);
-                  statusOutput.textContent = `Located: Enemy ${selectedId}`;
-                  errorOutput.textContent = "Failed to fetch place name.";
-                }
-              );
-            } catch (error) {
-              console.error('Reverse geocoding failed:', error);
-              statusOutput.textContent = `Located: Enemy ${selectedId}`;
-              errorOutput.textContent = "Failed to fetch place name.";
+                );
+              } catch (error) {
+                console.error('Reverse geocoding failed:', error);
+                statusOutput.textContent = `Located: Enemy ${selectedId}`;
+                errorOutput.textContent = "Failed to fetch place name.";
+              }
             }
           } else {
             console.error('Selected marker not found:', selectedId);
@@ -1113,7 +1239,7 @@
           }
         } else {
           console.log('No enemy selected, clearing outputs');
-          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
+          ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","bearingTrueOutput","bearingMagneticOutput","bearingMilsOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
           statusOutput.textContent = isTracking ? "Tracking Active" : "";
         }
       });
