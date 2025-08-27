@@ -253,6 +253,69 @@
     .leaflet-control-geocoder-results a:hover {
       background: #3a5a3a;
     }
+    #toolbar {
+      position: absolute;
+      left: 0;
+      top: 100px;
+      width: 250px;
+      background: #1e2e1e;
+      padding: 16px;
+      border-right: 1px solid #4b704b;
+      box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+      transition: left 0.3s ease;
+      z-index: 1000;
+      border-radius: 0 8px 8px 0;
+    }
+    #toolbar.hidden {
+      left: -250px;
+    }
+    #toggleToolbarBtn {
+      position: absolute;
+      left: 250px;
+      top: 0;
+      background: linear-gradient(135deg, #4b704b, #3a5a3a);
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 0 6px 6px 0;
+      transition: left 0.3s ease;
+    }
+    #toolbar.hidden #toggleToolbarBtn {
+      left: 250px;
+    }
+    .toolbar-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .buffer-panel {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .buffer-panel.active {
+      display: flex;
+    }
+    .buffer-panel label {
+      color: #d4d4d4;
+      font-size: 0.9em;
+    }
+    .buffer-panel input, .buffer-panel select {
+      background: #2e4a2e;
+      color: #fff;
+      border: 1px solid #5a8a5a;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .buffer-panel input[type="range"] {
+      width: 100%;
+    }
+    #clearBuffersBtn {
+      background: linear-gradient(135deg, #a00, #800);
+    }
+    #clearBuffersBtn:hover {
+      background: linear-gradient(135deg, #c00, #a00);
+    }
     @media (max-width: 768px) {
       #map {
         height: 50vh;
@@ -282,6 +345,15 @@
       .leaflet-control-geocoder-form input {
         width: 150px;
       }
+      #toolbar {
+        width: 200px;
+      }
+      #toggleToolbarBtn {
+        left: 200px;
+      }
+      #toolbar.hidden #toggleToolbarBtn {
+        left: 200px;
+      }
     }
     @media (max-width: 480px) {
       h1 {
@@ -295,6 +367,15 @@
       }
       .leaflet-control-geocoder-form input {
         width: 120px;
+      }
+      #toolbar {
+        width: 180px;
+      }
+      #toggleToolbarBtn {
+        left: 180px;
+      }
+      #toolbar.hidden #toggleToolbarBtn {
+        left: 180px;
       }
     }
   </style>
@@ -333,6 +414,32 @@
         <p class="status" id="statusOutput"></p>
         <p class="error" id="errorOutput"></p>
       </div>
+    </div>
+  </div>
+  <div id="toolbar" class="hidden">
+    <button id="toggleToolbarBtn">>></button>
+    <div class="toolbar-content">
+      <button id="createBufferBtn">Create Buffer</button>
+      <div class="buffer-panel" id="bufferPanel">
+        <label for="bufferLocation">Select Location:</label>
+        <select id="bufferLocation">
+          <option value="">Select...</option>
+          <option value="self">My Location</option>
+          <!-- Enemies will be populated dynamically -->
+        </select>
+        <label for="bufferRadius">Radius:</label>
+        <input type="number" id="bufferRadius" min="0" step="any" placeholder="Enter radius">
+        <select id="bufferUnit">
+          <option value="m">Meters (m)</option>
+          <option value="km">Kilometers (km)</option>
+          <option value="mi">Miles (mi)</option>
+        </select>
+        <label for="bufferOpacity">Opacity (0-1):</label>
+        <input type="range" id="bufferOpacity" min="0" max="1" step="0.1" value="0.5">
+        <span id="opacityValue">0.5</span>
+        <button id="applyBufferBtn">Apply Buffer</button>
+      </div>
+      <button id="clearBuffersBtn">Clear Buffers</button>
     </div>
   </div>
 
@@ -513,6 +620,7 @@
 
       let gpsMarker = null;
       const enemyLayer = L.layerGroup().addTo(map);
+      const bufferLayer = L.layerGroup().addTo(map);
       let enemyCounter = 0;
       let enemyMarkers = [];
       let currentUserLocation = null;
@@ -551,6 +659,19 @@
       const enemySelect = document.getElementById('enemySelect');
       const errorOutput = document.getElementById('errorOutput');
       const statusOutput = document.getElementById('statusOutput');
+
+      // Toolbar elements
+      const toolbar = document.getElementById('toolbar');
+      const toggleToolbarBtn = document.getElementById('toggleToolbarBtn');
+      const createBufferBtn = document.getElementById('createBufferBtn');
+      const bufferPanel = document.getElementById('bufferPanel');
+      const bufferLocation = document.getElementById('bufferLocation');
+      const bufferRadius = document.getElementById('bufferRadius');
+      const bufferUnit = document.getElementById('bufferUnit');
+      const bufferOpacity = document.getElementById('bufferOpacity');
+      const opacityValue = document.getElementById('opacityValue');
+      const applyBufferBtn = document.getElementById('applyBufferBtn');
+      const clearBuffersBtn = document.getElementById('clearBuffersBtn');
 
       let watchId = null, isTracking = false, isFirstFix = true;
 
@@ -672,6 +793,7 @@
           });
           console.log('Enemy markers after loading:', enemyMarkers);
           updateEnemyDropdown();
+          updateBufferLocationDropdown();
         } catch (error) {
           console.error('Error loading enemy markers:', error);
           document.getElementById('errorOutput').textContent = "Failed to load enemy markers.";
@@ -733,6 +855,16 @@
         });
         console.log('Dropdown updated, options:', enemySelect.options.length);
       }, 2000);
+
+      function updateBufferLocationDropdown() {
+        bufferLocation.innerHTML = '<option value="">Select...</option><option value="self">My Location</option>';
+        enemyMarkers.forEach(marker => {
+          const option = document.createElement('option');
+          option.value = marker.id;
+          option.textContent = `Enemy ${marker.id}`;
+          bufferLocation.appendChild(option);
+        });
+      }
 
       function exportCoordinates() {
         console.log('Exporting coordinates, enemyMarkers:', enemyMarkers);
@@ -881,6 +1013,7 @@
           enemyMarkers.push({ id, lat, lon, marker });
           saveEnemyMarker(lat, lon, id);
           shouldUpdateDropdown = true;
+          updateBufferLocationDropdown();
         }
 
         if (shouldUpdateDropdown) {
@@ -918,6 +1051,7 @@
               pos.coords.altitudeAccuracy,
               true
             );
+            updateBufferLocationDropdown();
           },
           err => {
             console.error('Geolocation error:', err);
@@ -1000,6 +1134,7 @@
         lastValidAltitude = null;
         lastValidAGL = null;
         updateEnemyDropdown();
+        updateBufferLocationDropdown();
         ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
         statusOutput.textContent = "";
       });
@@ -1116,6 +1251,78 @@
           ["mgrsOutput","latLonOutput","dmsOutput","utmOutput","altitudeOutput","aglOutput","distanceOutput","accuracyOutput","timestampOutput"].forEach(id => document.getElementById(id).textContent = "N/A");
           statusOutput.textContent = isTracking ? "Tracking Active" : "";
         }
+      });
+
+      // Toolbar functionality
+      toggleToolbarBtn.addEventListener('click', () => {
+        toolbar.classList.toggle('hidden');
+        toggleToolbarBtn.textContent = toolbar.classList.contains('hidden') ? '>>' : '<<';
+      });
+
+      createBufferBtn.addEventListener('click', () => {
+        bufferPanel.classList.toggle('active');
+      });
+
+      bufferOpacity.addEventListener('input', () => {
+        opacityValue.textContent = bufferOpacity.value;
+      });
+
+      applyBufferBtn.addEventListener('click', () => {
+        const selected = bufferLocation.value;
+        const radiusValue = parseFloat(bufferRadius.value);
+        const unit = bufferUnit.value;
+        const opacity = parseFloat(bufferOpacity.value);
+
+        if (!selected || isNaN(radiusValue) || radiusValue <= 0) {
+          errorOutput.textContent = "Please select a location and enter a valid radius.";
+          return;
+        }
+
+        let lat, lon, color;
+        if (selected === 'self') {
+          if (!currentUserLocation) {
+            errorOutput.textContent = "No current location available.";
+            return;
+          }
+          lat = currentUserLocation.lat;
+          lon = currentUserLocation.lon;
+          color = 'green';
+        } else {
+          const marker = enemyMarkers.find(m => m.id == selected);
+          if (!marker) {
+            errorOutput.textContent = "Selected location not found.";
+            return;
+          }
+          lat = marker.lat;
+          lon = marker.lon;
+          color = 'red';
+        }
+
+        let radiusInMeters;
+        if (unit === 'm') {
+          radiusInMeters = radiusValue;
+        } else if (unit === 'km') {
+          radiusInMeters = radiusValue * 1000;
+        } else if (unit === 'mi') {
+          radiusInMeters = radiusValue * 1609.34;
+        }
+
+        const buffer = L.circle([lat, lon], {
+          color: color,
+          fillColor: color,
+          fillOpacity: opacity,
+          radius: radiusInMeters
+        }).addTo(bufferLayer);
+
+        statusOutput.textContent = "Buffer added.";
+        bufferPanel.classList.remove('active');
+        bufferRadius.value = '';
+        bufferLocation.value = '';
+      });
+
+      clearBuffersBtn.addEventListener('click', () => {
+        bufferLayer.clearLayers();
+        statusOutput.textContent = "Buffers cleared.";
       });
 
       console.log('Initializing enemy markers');
