@@ -487,8 +487,8 @@
       </div>
     </div>
   </div>
-  <div id="toolbar" class="hidden">
-    <button id="toggleToolbarBtn">>></button>
+  <div id="toolbar"> <!-- Removed class="hidden" -->
+    <button id="toggleToolbarBtn"><<</button> <!-- Updated to '<<' for hiding -->
     <div class="toolbar-content">
       <button id="createBufferBtn"><i class="fas fa-draw-polygon"></i> Create Buffer</button>
       <div class="buffer-panel" id="bufferPanel">
@@ -785,6 +785,9 @@
       const confirmMarkerBtn = document.getElementById('confirmMarkerBtn');
 
       let watchId = null, isTracking = false, isFirstFix = true;
+
+      // Initialize toolbar toggle button text
+      toggleToolbarBtn.textContent = toolbar.classList.contains('hidden') ? '>>' : '<<';
 
       if (!navigator.geolocation) {
         errorOutput.textContent = "Geolocation is not supported by this browser.";
@@ -1433,6 +1436,7 @@
 
       // Toolbar functionality
       toggleToolbarBtn.addEventListener('click', () => {
+        console.log('Toggle button clicked, current hidden state:', toolbar.classList.contains('hidden'));
         toolbar.classList.toggle('hidden');
         toggleToolbarBtn.textContent = toolbar.classList.contains('hidden') ? '>>' : '<<';
       });
