@@ -316,6 +316,14 @@
     #clearBuffersBtn:hover {
       background: linear-gradient(135deg, #c00, #a00);
     }
+    .leaflet-popup-content-wrapper {
+      background: #2e4a2e;
+      color: #e0e0e0;
+      border-radius: 4px;
+    }
+    .leaflet-popup-tip {
+      background: #2e4a2e;
+    }
     @media (max-width: 768px) {
       #map {
         height: 50vh;
@@ -437,6 +445,13 @@
         <label for="bufferOpacity">Opacity (0-1):</label>
         <input type="range" id="bufferOpacity" min="0" max="1" step="0.1" value="0.5">
         <span id="opacityValue">0.5</span>
+        <label for="bufferColor">Buffer Color:</label>
+        <select id="bufferColor">
+          <option value="green">Green</option>
+          <option value="red">Red</option>
+          <option value="blue">Blue</option>
+          <option value="yellow">Yellow</option>
+        </select>
         <button id="applyBufferBtn">Apply Buffer</button>
       </div>
       <button id="clearBuffersBtn">Clear Buffers</button>
@@ -628,9 +643,11 @@
       let lastValidAltitude = null;
       let lastValidAGL = null;
       let isDropdownOpen = false;
+      let isBufferDropdownOpen = false;
       let distanceUnit = 'km';
       let lastDropdownUpdate = 0;
       let lastGpsUpdate = 0;
+      let lastBufferDropdownUpdate = 0;
 
       const redIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
@@ -670,6 +687,7 @@
       const bufferUnit = document.getElementById('bufferUnit');
       const bufferOpacity = document.getElementById('bufferOpacity');
       const opacityValue = document.getElementById('opacityValue');
+      const bufferColor = document.getElementById('bufferColor');
       const applyBufferBtn = document.getElementById('applyBufferBtn');
       const clearBuffersBtn = document.getElementById('clearBuffersBtn');
 
@@ -681,16 +699,29 @@
       }
 
       enemySelect.addEventListener('mousedown', () => {
-        console.log('Dropdown mousedown, setting isDropdownOpen = true');
+        console.log('Enemy dropdown mousedown, setting isDropdownOpen = true');
         isDropdownOpen = true;
       });
       enemySelect.addEventListener('change', () => {
-        console.log('Dropdown changed, selected value:', enemySelect.value);
+        console.log('Enemy dropdown changed, selected value:', enemySelect.value);
         isDropdownOpen = false;
       });
       enemySelect.addEventListener('blur', () => {
-        console.log('Dropdown blur, setting isDropdownOpen = false');
+        console.log('Enemy dropdown blur, setting isDropdownOpen = false');
         isDropdownOpen = false;
+      });
+
+      bufferLocation.addEventListener('mousedown', () => {
+        console.log('Buffer dropdown mousedown, setting isBufferDropdownOpen = true');
+        isBufferDropdownOpen = true;
+      });
+      bufferLocation.addEventListener('change', () => {
+        console.log('Buffer dropdown changed, selected value:', bufferLocation.value);
+        isBufferDropdownOpen = false;
+      });
+      bufferLocation.addEventListener('blur', () => {
+        console.log('Buffer dropdown blur, setting isBufferDropdownOpen = false');
+        isBufferDropdownOpen = false;
       });
 
       function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -820,14 +851,14 @@
       }
 
       const updateEnemyDropdown = debounce((selectedId = null) => {
-        console.log('Updating dropdown, selectedId:', selectedId, 'isDropdownOpen:', isDropdownOpen);
+        console.log('Updating enemy dropdown, selectedId:', selectedId, 'isDropdownOpen:', isDropdownOpen);
         if (isDropdownOpen) {
-          console.log('Dropdown open, skipping update');
+          console.log('Enemy dropdown open, skipping update');
           return;
         }
         const now = Date.now();
         if (now - lastDropdownUpdate < 2000) {
-          console.log('Too soon since last update:', now - lastDropdownUpdate);
+          console.log('Too soon since last enemy dropdown update:', now - lastDropdownUpdate);
           return;
         }
         lastDropdownUpdate = now;
@@ -853,10 +884,25 @@
           option.selected = marker.id == selectedId;
           enemySelect.appendChild(option);
         });
-        console.log('Dropdown updated, options:', enemySelect.options.length);
+        console.log('Enemy dropdown updated, options:', enemySelect.options.length);
       }, 2000);
 
-      function updateBufferLocationDropdown() {
+      const updateBufferLocationDropdown = debounce(() => {
+        console.log('Updating buffer location dropdown, isBufferDropdownOpen:', isBufferDropdownOpen);
+        if (isBufferDropdownOpen) {
+          console.log('Buffer dropdown open, skipping update');
+          return;
+        }
+        const now = Date.now();
+        if (now - lastBufferDropdownUpdate < 2000) {
+          console.log('Too soon since last buffer dropdown update:', now - lastBufferDropdownUpdate);
+          return;
+        }
+        lastBufferDropdownUpdate = now;
+
+        const currentValue = bufferLocation.value;
+        console.log('Preserving buffer dropdown value:', currentValue);
+
         bufferLocation.innerHTML = '<option value="">Select...</option><option value="self">My Location</option>';
         enemyMarkers.forEach(marker => {
           const option = document.createElement('option');
@@ -864,7 +910,20 @@
           option.textContent = `Enemy ${marker.id}`;
           bufferLocation.appendChild(option);
         });
-      }
+
+        // Restore the previously selected value if it still exists
+        if (currentValue) {
+          const optionExists = Array.from(bufferLocation.options).some(opt => opt.value === currentValue);
+          if (optionExists) {
+            bufferLocation.value = currentValue;
+            console.log('Restored buffer dropdown value:', currentValue);
+          } else {
+            console.log('Previous buffer dropdown value not found, resetting to default');
+            bufferLocation.value = '';
+          }
+        }
+        console.log('Buffer dropdown updated, options:', bufferLocation.options.length);
+      }, 2000);
 
       function exportCoordinates() {
         console.log('Exporting coordinates, enemyMarkers:', enemyMarkers);
@@ -1004,6 +1063,7 @@
             map.flyTo([lat, lon], Math.min(15, maxZoom));
             isFirstFix = false;
           }
+          updateBufferLocationDropdown();
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
           enemyCounter = Math.max(enemyCounter, id);
           const marker = L.marker([lat, lon], { icon: redIcon })
@@ -1017,7 +1077,7 @@
         }
 
         if (shouldUpdateDropdown) {
-          console.log('Triggering dropdown update with selectedId:', id || enemySelect.value);
+          console.log('Triggering enemy dropdown update with selectedId:', id || enemySelect.value);
           updateEnemyDropdown(id || enemySelect.value);
         }
       }
@@ -1051,7 +1111,6 @@
               pos.coords.altitudeAccuracy,
               true
             );
-            updateBufferLocationDropdown();
           },
           err => {
             console.error('Geolocation error:', err);
@@ -1267,18 +1326,31 @@
         opacityValue.textContent = bufferOpacity.value;
       });
 
+      function zoomToBuffer(lat, lon, radiusInMeters) {
+        const earthRadius = 6371000; // Earth's radius in meters
+        const latDelta = (radiusInMeters / earthRadius) * (180 / Math.PI);
+        const lonDelta = latDelta / Math.cos(lat * Math.PI / 180);
+        const bounds = L.latLngBounds(
+          [lat - latDelta, lon - lonDelta],
+          [lat + latDelta, lon + lonDelta]
+        );
+        const maxZoom = getCurrentBasemapMaxZoom();
+        map.fitBounds(bounds, { maxZoom: Math.min(15, maxZoom) });
+      }
+
       applyBufferBtn.addEventListener('click', () => {
         const selected = bufferLocation.value;
         const radiusValue = parseFloat(bufferRadius.value);
         const unit = bufferUnit.value;
         const opacity = parseFloat(bufferOpacity.value);
+        const color = bufferColor.value;
 
         if (!selected || isNaN(radiusValue) || radiusValue <= 0) {
           errorOutput.textContent = "Please select a location and enter a valid radius.";
           return;
         }
 
-        let lat, lon, color;
+        let lat, lon, label;
         if (selected === 'self') {
           if (!currentUserLocation) {
             errorOutput.textContent = "No current location available.";
@@ -1286,7 +1358,7 @@
           }
           lat = currentUserLocation.lat;
           lon = currentUserLocation.lon;
-          color = 'green';
+          label = `My Location: ${radiusValue} ${unit}`;
         } else {
           const marker = enemyMarkers.find(m => m.id == selected);
           if (!marker) {
@@ -1295,7 +1367,7 @@
           }
           lat = marker.lat;
           lon = marker.lon;
-          color = 'red';
+          label = `Enemy ${marker.id}: ${radiusValue} ${unit}`;
         }
 
         let radiusInMeters;
@@ -1312,12 +1384,14 @@
           fillColor: color,
           fillOpacity: opacity,
           radius: radiusInMeters
-        }).addTo(bufferLayer);
+        }).bindPopup(label).addTo(bufferLayer);
 
-        statusOutput.textContent = "Buffer added.";
+        zoomToBuffer(lat, lon, radiusInMeters);
+        statusOutput.textContent = `Buffer added: ${label}`;
         bufferPanel.classList.remove('active');
         bufferRadius.value = '';
         bufferLocation.value = '';
+        bufferColor.value = 'green';
       });
 
       clearBuffersBtn.addEventListener('click', () => {
