@@ -644,7 +644,9 @@
       let gpsMarker = null;
       const markerLayer = L.layerGroup().addTo(map);
       const bufferLayer = L.layerGroup().addTo(map);
-      let markerCounter = 0;
+      let enemyCounter = 0;
+      let allyCounter = 0;
+      let poiCounter = 0;
       let markers = [];
       let currentUserLocation = null;
       let lastUserLocation = null;
@@ -799,8 +801,6 @@
         }
       }
 
-      const elevationCache = new Map();
-      
       async function getTerrainElevation(lat, lon, retries = 2, delay = 2000) {
         const cacheKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
         if (elevationCache.has(cacheKey)) {
@@ -835,19 +835,27 @@
         }
       }
 
+      const elevationCache = new Map();
+
       function loadMarkers() {
         console.log('Loading markers from localStorage');
         try {
           const storedMarkers = JSON.parse(localStorage.getItem('markers') || '[]');
           console.log('Loaded markers:', storedMarkers);
           markers = [];
+          enemyCounter = 0;
+          allyCounter = 0;
+          poiCounter = 0;
           storedMarkers.forEach(marker => {
-            if (marker.id && marker.lat && marker.lon && marker.type) {
-              markerCounter = Math.max(markerCounter, marker.id);
-              const leafletMarker = L.marker([marker.lat, marker.lon], { icon: markerIcons[marker.type] })
-                .bindPopup(`${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.id}`)
+            if (marker.typeId && marker.lat && marker.lon && marker.type) {
+              const type = marker.type;
+              if (type === 'enemy') enemyCounter = Math.max(enemyCounter, marker.typeId);
+              else if (type === 'ally') allyCounter = Math.max(allyCounter, marker.typeId);
+              else if (type === 'poi') poiCounter = Math.max(poiCounter, marker.typeId);
+              const leafletMarker = L.marker([marker.lat, marker.lon], { icon: markerIcons[type] })
+                .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} ${marker.typeId}`)
                 .addTo(markerLayer);
-              markers.push({ id: marker.id, lat: marker.lat, lon: marker.lon, type: marker.type, marker: leafletMarker });
+              markers.push({ typeId: marker.typeId, lat: marker.lat, lon: marker.lon, type, marker: leafletMarker });
             }
           });
           console.log('Markers after loading:', markers);
@@ -859,10 +867,10 @@
         }
       }
 
-      function saveMarker(lat, lon, id, type) {
-        console.log('Saving marker:', { lat, lon, id, type });
+      function saveMarker(lat, lon, typeId, type) {
+        console.log('Saving marker:', { lat, lon, typeId, type });
         const storedMarkers = JSON.parse(localStorage.getItem('markers') || '[]');
-        storedMarkers.push({ lat, lon, id, type });
+        storedMarkers.push({ lat, lon, typeId, type });
         localStorage.setItem('markers', JSON.stringify(storedMarkers));
       }
 
@@ -896,7 +904,7 @@
 
         enemySelect.innerHTML = '<option value="">Select a marker...</option>';
         markers.forEach(marker => {
-          let label = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.id}`;
+          let label = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
           if (currentUserLocation) {
             const distance = calculateDistance(
               currentUserLocation.lat,
@@ -907,9 +915,9 @@
             label += ` (${distance} ${distanceUnit})`;
           }
           const option = document.createElement('option');
-          option.value = marker.id;
+          option.value = `${marker.type}-${marker.typeId}`;
           option.textContent = label;
-          option.selected = marker.id == selectedId;
+          option.selected = selectedId && `${marker.type}-${marker.typeId}` === selectedId;
           enemySelect.appendChild(option);
         });
         console.log('Marker dropdown updated, options:', enemySelect.options.length);
@@ -934,8 +942,8 @@
         bufferLocation.innerHTML = '<option value="">Select...</option><option value="self">My Location</option>';
         markers.forEach(marker => {
           const option = document.createElement('option');
-          option.value = marker.id;
-          option.textContent = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.id}`;
+          option.value = `${marker.type}-${marker.typeId}`;
+          option.textContent = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
           bufferLocation.appendChild(option);
         });
 
@@ -968,7 +976,7 @@
               lon
             ).toFixed(2) + ` ${distanceUnit}`;
           }
-          return { id: `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.id}`, lat, lon, mgrs, distance };
+          return { id: `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`, lat, lon, mgrs, distance };
         });
         const csv = `ID,Latitude,Longitude,MGRS,Distance (${distanceUnit})\n` + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs},${d.distance}`).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
@@ -1004,8 +1012,8 @@
         }
       }
 
-      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, id = null, type = null) {
-        console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, id, type });
+      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, typeId = null, type = null) {
+        console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, typeId, type });
 
         let mgrs;
         try { mgrs = proj4.mgrs.forward([lon, lat]); } catch { mgrs = "N/A"; }
@@ -1062,7 +1070,7 @@
             console.log('Skipping GPS update: location change not significant');
             return;
           }
-        } else if (id && type) {
+        } else if (typeId && type) {
           if (currentUserLocation) {
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
           }
@@ -1091,21 +1099,20 @@
             isFirstFix = false;
           }
           updateBufferLocationDropdown();
-        } else if (id && type && !markers.some(marker => marker.id === id)) {
-          markerCounter = Math.max(markerCounter, id);
+        } else if (typeId && type && !markers.some(marker => marker.type === type && marker.typeId === typeId)) {
           const marker = L.marker([lat, lon], { icon: markerIcons[type] })
-            .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} ${id}`)
+            .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} ${typeId}`)
             .addTo(markerLayer)
             .openPopup();
-          markers.push({ id, lat, lon, type, marker });
-          saveMarker(lat, lon, id, type);
+          markers.push({ typeId, lat, lon, type, marker });
+          saveMarker(lat, lon, typeId, type);
           shouldUpdateDropdown = true;
           updateBufferLocationDropdown();
         }
 
         if (shouldUpdateDropdown) {
-          console.log('Triggering marker dropdown update with selectedId:', id || enemySelect.value);
-          updateMarkerDropdown(id || enemySelect.value);
+          console.log('Triggering marker dropdown update with selectedId:', typeId ? `${type}-${typeId}` : enemySelect.value);
+          updateMarkerDropdown(typeId ? `${type}-${typeId}` : enemySelect.value);
         }
       }
 
@@ -1195,28 +1202,32 @@
         map.getContainer().style.cursor = 'crosshair';
         map.once('click', async e => {
           console.log('Map clicked for marker:', { latlng: e.latlng, type: selectedType });
-          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, markerCounter + 1, selectedType);
+          let typeId;
+          if (selectedType === 'enemy') typeId = ++enemyCounter;
+          else if (selectedType === 'ally') typeId = ++allyCounter;
+          else if (selectedType === 'poi') typeId = ++poiCounter;
+          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, typeId, selectedType);
           try {
             L.Control.Geocoder.nominatim().reverse(
               L.latLng(e.latlng.lat, e.latlng.lng),
               map.getZoom(),
               (result) => {
                 if (result && result.name) {
-                  statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${markerCounter + 1} (${result.name})`;
+                  statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId} (${result.name})`;
                 } else {
-                  statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${markerCounter + 1}`;
+                  statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
                   console.warn('No place name found for coordinates:', e.latlng.lat, e.latlng.lng);
                 }
               },
               (error) => {
                 console.error('Reverse geocoding error:', error);
-                statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${markerCounter + 1}`;
+                statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
                 errorOutput.textContent = "Failed to fetch place name.";
               }
             );
           } catch (error) {
             console.error('Reverse geocoding failed:', error);
-            statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${markerCounter + 1}`;
+            statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
             errorOutput.textContent = "Failed to fetch place name.";
           }
           map.getContainer().style.cursor = '';
@@ -1227,7 +1238,9 @@
         console.log('Clear Markers button clicked');
         markerLayer.clearLayers();
         markers = [];
-        markerCounter = 0;
+        enemyCounter = 0;
+        allyCounter = 0;
+        poiCounter = 0;
         localStorage.removeItem('markers');
         currentUserLocation = null;
         lastUserLocation = null;
@@ -1257,7 +1270,8 @@
         toggleUnitsBtn.textContent = `Toggle Units (${distanceUnit === 'km' ? 'mi' : 'km'})`;
         updateMarkerDropdown(enemySelect.value);
         if (enemySelect.value && currentUserLocation) {
-          const selectedMarker = markers.find(marker => marker.id == enemySelect.value);
+          const [type, typeId] = enemySelect.value.split('-');
+          const selectedMarker = markers.find(marker => marker.type === type && marker.typeId == typeId);
           if (selectedMarker) {
             document.getElementById('distanceOutput').textContent = calculateDistance(
               currentUserLocation.lat,
@@ -1312,9 +1326,10 @@
         console.log('Marker select changed, value:', enemySelect.value);
         const selectedId = enemySelect.value;
         if (selectedId) {
-          const selectedMarker = markers.find(marker => marker.id == selectedId);
+          const [type, typeId] = selectedId.split('-');
+          const selectedMarker = markers.find(marker => marker.type === type && marker.typeId == typeId);
           if (selectedMarker) {
-            await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id, selectedMarker.type);
+            await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.typeId, selectedMarker.type);
             const maxZoom = getCurrentBasemapMaxZoom();
             console.log('Zooming to marker:', { lat: selectedMarker.lat, lon: selectedMarker.lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
             map.flyTo([selectedMarker.lat, selectedMarker.lon], Math.min(15, maxZoom));
@@ -1324,21 +1339,21 @@
                 map.getZoom(),
                 (result) => {
                   if (result && result.name) {
-                    statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedId} (${result.name})`;
+                    statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedMarker.typeId} (${result.name})`;
                   } else {
-                    statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedId}`;
+                    statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedMarker.typeId}`;
                     console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
                   }
                 },
                 (error) => {
                   console.error('Reverse geocoding error:', error);
-                  statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedId}`;
+                  statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedMarker.typeId}`;
                   errorOutput.textContent = "Failed to fetch place name.";
                 }
               );
             } catch (error) {
               console.error('Reverse geocoding failed:', error);
-              statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedId}`;
+              statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedMarker.typeId}`;
               errorOutput.textContent = "Failed to fetch place name.";
             }
           } else {
@@ -1403,14 +1418,15 @@
           lon = currentUserLocation.lon;
           label = `My Location: ${radiusValue} ${unit}`;
         } else {
-          const marker = markers.find(m => m.id == selected);
+          const [type, typeId] = selected.split('-');
+          const marker = markers.find(m => m.type === type && m.typeId == typeId);
           if (!marker) {
             errorOutput.textContent = "Selected location not found.";
             return;
           }
           lat = marker.lat;
           lon = marker.lon;
-          label = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.id}: ${radiusValue} ${unit}`;
+          label = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}: ${radiusValue} ${unit}`;
         }
 
         let radiusInMeters;
