@@ -305,7 +305,7 @@
       background: rgba(58, 90, 58, 0.8);
     }
     #toolbar {
-      position: absolute;
+      position: fixed;
       left: 0;
       top: 100px;
       width: 250px;
@@ -313,29 +313,31 @@
       padding: 16px;
       border-right: 1px solid rgba(75, 112, 75, 0.5);
       box-shadow: 4px 0 8px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 255, 159, 0.1);
-      transition: left 0.5s ease, opacity 0.5s ease;
+      transition: transform 0.5s ease, opacity 0.5s ease;
       z-index: 1000;
       border-radius: 0 12px 12px 0;
       backdrop-filter: blur(10px);
+      transform: translateX(0);
     }
     #toolbar.hidden {
-      left: -250px;
+      transform: translateX(-100%);
       opacity: 0;
     }
     #toggleToolbarBtn {
       position: absolute;
-      left: 250px;
+      left: 100%;
       top: 0;
       background: linear-gradient(135deg, #00ff9f, #00b894);
       border: none;
       padding: 8px;
       cursor: pointer;
       border-radius: 0 8px 8px 0;
-      transition: left 0.5s ease, transform 0.3s ease;
+      transition: transform 0.3s ease;
       box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+      z-index: 1001;
     }
     #toolbar.hidden #toggleToolbarBtn {
-      left: 0;
+      transform: translateX(-250px);
     }
     #toggleToolbarBtn i {
       transition: transform 0.3s ease;
@@ -424,11 +426,8 @@
       #toolbar {
         width: 200px;
       }
-      #toggleToolbarBtn {
-        left: 200px;
-      }
       #toolbar.hidden #toggleToolbarBtn {
-        left: 0;
+        transform: translateX(-200px);
       }
     }
     @media (max-width: 480px) {
@@ -447,11 +446,8 @@
       #toolbar {
         width: 180px;
       }
-      #toggleToolbarBtn {
-        left: 180px;
-      }
       #toolbar.hidden #toggleToolbarBtn {
-        left: 0;
+        transform: translateX(-180px);
       }
     }
   </style>
@@ -1410,7 +1406,7 @@
                     statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedMarker.typeId} (${result.name})`;
                   } else {
                     statusOutput.textContent = `Located: ${selectedMarker.type.charAt(0).toUpperCase() + selectedMarker.type.slice(1)} ${selectedMarker.typeId}`;
-                    console.warn('No place name found for coordinates:', selectedMarker.lat, selectedMarker.lon);
+                    console.warn('No place name found for coordinates:', selectedMarker.lat,  selectedMarker.lon);
                   }
                 },
                 (error) => {
@@ -1438,9 +1434,14 @@
 
       // Toolbar functionality
       toggleToolbarBtn.addEventListener('click', () => {
-        console.log('Toggle button clicked, current hidden state:', toolbar.classList.contains('hidden'));
+        console.log('Toggle toolbar button clicked, current hidden state:', toolbar.classList.contains('hidden'));
         toolbar.classList.toggle('hidden');
+        console.log('New toolbar hidden state:', toolbar.classList.contains('hidden'));
       });
+
+      // Initialize toolbar state
+      console.log('Initializing toolbar state');
+      toolbar.classList.remove('hidden'); // Ensure toolbar is visible on load
 
       createBufferBtn.addEventListener('click', () => {
         bufferPanel.classList.toggle('active');
@@ -1504,30 +1505,39 @@
           radiusInMeters = radiusValue * 1000;
         } else if (unit === 'mi') {
           radiusInMeters = radiusValue * 1609.34;
-        }
+}
 
+        console.log('Applying buffer:', { lat, lon, radiusInMeters, opacity, color, label });
         const buffer = L.circle([lat, lon], {
+          radius: radiusInMeters,
           color: color,
-          fillColor: color,
           fillOpacity: opacity,
-          radius: radiusInMeters
+          weight: 2
         }).bindPopup(label).addTo(bufferLayer);
-
         zoomToBuffer(lat, lon, radiusInMeters);
-        statusOutput.textContent = `Buffer added: ${label}`;
+        statusOutput.textContent = `Buffer created: ${label}`;
         bufferPanel.classList.remove('active');
-        bufferRadius.value = '';
-        bufferLocation.value = '';
-        bufferColor.value = 'green';
+        errorOutput.textContent = '';
       });
 
       clearBuffersBtn.addEventListener('click', () => {
+        console.log('Clear Buffers button clicked');
         bufferLayer.clearLayers();
-        statusOutput.textContent = "Buffers cleared.";
+        statusOutput.textContent = 'Buffers cleared';
       });
 
-      console.log('Initializing markers');
       loadMarkers();
+
+      // Initialize map and toolbar
+      console.log('Initializing map and toolbar');
+      map.on('click', () => {
+        if (!markerPanel.classList.contains('active')) {
+          map.getContainer().style.cursor = '';
+        }
+      });
+
+      // Ensure toolbar is visible on load
+      toolbar.classList.remove('hidden');
     });
   </script>
 </body>
