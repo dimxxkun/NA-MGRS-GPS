@@ -343,26 +343,15 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('DOM loaded, initializing map and controls');
-      const map = L.map('map', {
-        maxZoom: 18,
-        minZoom: 3
-      }).setView([9.0765, 7.3986], 8);
+      const map = L.map('map').setView([9.0765, 7.3986], 8);
 
       // Basemaps
-      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
-        maxZoom: 18
-      });
-      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 18
-      }).addTo(map);
+      const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
+      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map);
       const esriTerrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenTopoMap (CC-BY-SA)',
-        maxZoom: 17
+        attribution: '© OpenTopoMap (CC-BY-SA)'
       });
-      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 18
-      });
+      const esriLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}');
 
       const layerControl = L.control.layers(
         {
@@ -373,12 +362,6 @@
         { "Labels": esriLabels }
       ).addTo(map);
 
-      // Helper function to get current basemap maxZoom
-      function getCurrentBasemapMaxZoom() {
-        const activeLayer = Object.keys(layerControl._layers).find(key => map.hasLayer(layerControl._layers[key].layer));
-        return layerControl._layers[activeLayer]?.layer?.options?.maxZoom || 18;
-      }
-
       // Custom geocoder to handle coordinates and place names
       const customGeocoder = {
         name: 'CustomGeocoder',
@@ -386,6 +369,7 @@
           console.log('Geocoding query:', query);
           query = query.trim();
 
+          // Helper function to return results
           const returnResults = (lat, lon, name) => {
             cb.call(context, [{
               center: L.latLng(lat, lon),
@@ -394,9 +378,10 @@
             }]);
           };
 
+          // Parse MGRS
           const parseMGRS = (input) => {
             try {
-              const ll = proj4.mgrs.toPoint(input.replace(/\s+/g, ''));
+              const ll = proj4.mgrs.toPoint(input.replace(/\s+/g, '')); // Remove spaces
               return { lat: ll[1], lon: ll[0] };
             } catch (e) {
               console.error('Invalid MGRS:', input, e);
@@ -404,6 +389,7 @@
             }
           };
 
+          // Parse UTM
           const parseUTM = (input) => {
             const utmRegex = /^(\d{1,2})([A-Z])\s*(\d+\.?\d*)\s*([mM]?)\s*E\s*,?\s*(\d+\.?\d*)\s*([mM]?)\s*N$/i;
             const match = input.match(utmRegex);
@@ -424,6 +410,7 @@
             return null;
           };
 
+          // Parse Decimal Degrees (DD)
           const parseDD = (input) => {
             const ddRegex = /^(-?\d+\.?\d*)\s*[,;]?\s*(-?\d+\.?\d*)$/;
             const match = input.match(ddRegex);
@@ -437,6 +424,7 @@
             return null;
           };
 
+          // Parse DMS
           const parseDMS = (input) => {
             const dmsRegex = /^(\d+)°\s*(\d+)'\s*(\d+\.?\d*)"\s*([NS])\s*[,;]?\s*(\d+)°\s*(\d+)'\s*(\d+\.?\d*)"\s*([EW])$/i;
             const match = input.match(dmsRegex);
@@ -460,6 +448,7 @@
             return null;
           };
 
+          // Try parsing as coordinates first
           let coords = parseMGRS(query);
           if (coords) return returnResults(coords.lat, coords.lon, `MGRS: ${query}`);
 
@@ -472,10 +461,12 @@
           coords = parseDMS(query);
           if (coords) return returnResults(coords.lat, coords.lon, `DMS: ${query}`);
 
+          // Fallback to Nominatim for place names
           L.Control.Geocoder.nominatim().geocode(query, cb, context);
         }
       };
 
+      // Add Search Control
       L.Control.geocoder({
         defaultMarkGeocode: false,
         placeholder: 'Search by name, MGRS, UTM, DD, or DMS...',
@@ -484,8 +475,7 @@
       }).on('markgeocode', function(e) {
         console.log('Search result selected:', e.geocode);
         const latlng = e.geocode.center;
-        const maxZoom = getCurrentBasemapMaxZoom();
-        map.flyTo(latlng, Math.min(12, maxZoom));
+        map.flyTo(latlng, 12);
         updateCoordinates(latlng.lat, latlng.lng, null, null, null, false, null);
         document.getElementById('statusOutput').textContent = `Located: ${e.geocode.name}`;
       }).addTo(map);
@@ -520,7 +510,7 @@
       let lastValidAltitude = null;
       let lastValidAGL = null;
       let isDropdownOpen = false;
-      let distanceUnit = 'km';
+      let distanceUnit = 'km'; // Default to kilometers
       let lastDropdownUpdate = 0;
       let lastGpsUpdate = 0;
 
@@ -559,6 +549,7 @@
         getLocationBtn.disabled = true;
       }
 
+      // Dropdown event listeners with debugging
       enemySelect.addEventListener('mousedown', () => {
         console.log('Dropdown mousedown, setting isDropdownOpen = true');
         isDropdownOpen = true;
@@ -572,23 +563,25 @@
         isDropdownOpen = false;
       });
 
+      // Calculate distance using Haversine formula
       function calculateDistance(lat1, lon1, lat2, lon2) {
         console.log('Calculating distance:', { lat1, lon1, lat2, lon2, distanceUnit });
-        const R = 6371;
+        const R = 6371; // Earth's radius in kilometers
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
         const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                   Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        let distance = R * c;
+        let distance = R * c; // Distance in kilometers
         if (distanceUnit === 'mi') {
-          distance *= 0.621371;
+          distance *= 0.621371; // Convert to miles
         }
         console.log('Distance calculated:', distance.toFixed(2), distanceUnit);
         return distance;
       }
 
+      // Check if location has changed significantly (more than 10 meters or 5 seconds elapsed)
       function hasLocationChanged(newLat, newLon, oldLat, oldLon) {
         const now = Date.now();
         if (!oldLat || !oldLon) {
@@ -596,19 +589,20 @@
           return true;
         }
         const timeElapsed = now - lastGpsUpdate;
-        const distance = calculateDistance(newLat, newLon, oldLat, oldLon) * (distanceUnit === 'km' ? 1000 : 1609.34);
-        const isSignificant = distance > 10 || timeElapsed > 5000;
+        const distance = calculateDistance(newLat, newLon, oldLat, oldLon) * (distanceUnit === 'km' ? 1000 : 1609.34); // Convert to meters
+        const isSignificant = distance > 10 || timeElapsed > 5000; // 10 meters or 5 seconds
         console.log('Location change check:', { newLat, newLon, oldLat, oldLon, distance, timeElapsed, isSignificant });
         return isSignificant;
       }
 
+      // Geoid height lookup for Nigeria (simplified)
       function getGeoidHeight(lat, lon) {
         console.log('Calculating geoid height for:', { lat, lon });
         try {
           if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-            if (lat < 7) return 20;
-            else if (lat < 10) return 25;
-            else return 30;
+            if (lat < 7) return 20; // Southern Nigeria
+            else if (lat < 10) return 25; // Central Nigeria
+            else return 30; // Northern Nigeria
           } else {
             throw new Error('Invalid coordinates');
           }
@@ -619,8 +613,10 @@
         }
       }
 
+      // Cache for elevation data to reduce API calls
       const elevationCache = new Map();
       
+      // Fetch terrain elevation from Open-Elevation API with retry logic
       async function getTerrainElevation(lat, lon, retries = 2, delay = 2000) {
         const cacheKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
         if (elevationCache.has(cacheKey)) {
@@ -649,7 +645,7 @@
             return getTerrainElevation(lat, lon, retries - 1, delay * 2);
           }
           console.log('Using fallback elevation for:', { lat, lon });
-          const fallback = lat < 7 ? 100 : lat < 10 ? 400 : 300;
+          const fallback = lat < 7 ? 100 : lat < 10 ? 400 : 300; // Southern, Central, Northern Nigeria
           elevationCache.set(cacheKey, fallback);
           return fallback;
         }
@@ -685,6 +681,7 @@
         localStorage.setItem('enemyMarkers', JSON.stringify(markers));
       }
 
+      // Debounced updateEnemyDropdown
       function debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -842,14 +839,14 @@
             }
           } else {
             console.log('Skipping GPS update: location change not significant');
-            return;
+            return; // Skip updating if location hasn't changed significantly
           }
         } else if (id) {
           if (currentUserLocation) {
             distance = calculateDistance(currentUserLocation.lat, currentUserLocation.lon, lat, lon).toFixed(2) + ` ${distanceUnit}`;
           }
           shouldUpdateDropdown = true;
-          correctedAltitude = null;
+          correctedAltitude = null; // Reset for non-GPS updates
           agl = null;
         }
 
@@ -866,12 +863,7 @@
         if (isGps) {
           if (gpsMarker) gpsMarker.setLatLng([lat, lon]);
           else gpsMarker = L.marker([lat, lon], { icon: greenIcon }).addTo(map);
-          if (isFirstFix) {
-            const maxZoom = getCurrentBasemapMaxZoom();
-            console.log('First fix zoom:', { lat, lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
-            map.flyTo([lat, lon], Math.min(15, maxZoom));
-            isFirstFix = false;
-          }
+          if (isFirstFix) { map.flyTo([lat, lon], 15); isFirstFix = false; }
         } else if (id && !enemyMarkers.some(marker => marker.id === id)) {
           enemyCounter = Math.max(enemyCounter, id);
           const marker = L.marker([lat, lon], { icon: redIcon })
@@ -889,6 +881,7 @@
         }
       }
 
+      // Throttle function for GPS updates
       function throttle(func, wait) {
         let lastCall = 0;
         return function (...args) {
@@ -903,7 +896,7 @@
 
       const throttledUpdateCoordinates = throttle(async (lat, lon, accuracy, altitude, altitudeAccuracy, isGps) => {
         await updateCoordinates(lat, lon, accuracy, altitude, altitudeAccuracy, isGps);
-      }, 5000);
+      }, 5000); // Throttle to every 5 seconds
 
       function startTracking() {
         console.log('Starting GPS tracking');
@@ -1007,9 +1000,7 @@
       centerBtn.addEventListener('click', () => {
         console.log('Center button clicked');
         if (gpsMarker) {
-          const maxZoom = getCurrentBasemapMaxZoom();
-          console.log('Centering map:', { latlng: gpsMarker.getLatLng(), zoomLevel: Math.min(15, maxZoom), maxZoom });
-          map.flyTo(gpsMarker.getLatLng(), Math.min(15, maxZoom));
+          map.flyTo(gpsMarker.getLatLng(), 15);
           statusOutput.textContent = isTracking ? "Tracking Active" : "";
         }
       });
@@ -1080,9 +1071,7 @@
           const selectedMarker = enemyMarkers.find(marker => marker.id == selectedId);
           if (selectedMarker) {
             await updateCoordinates(selectedMarker.lat, selectedMarker.lon, null, null, null, false, selectedMarker.id);
-            const maxZoom = getCurrentBasemapMaxZoom();
-            console.log('Zooming to enemy marker:', { lat: selectedMarker.lat, lon: selectedMarker.lon, zoomLevel: Math.min(15, maxZoom), maxZoom });
-            map.flyTo([selectedMarker.lat, selectedMarker.lon], Math.min(15, maxZoom));
+            map.flyTo([selectedMarker.lat, selectedMarker.lon], 15);
             try {
               L.Control.Geocoder.nominatim().reverse(
                 L.latLng(selectedMarker.lat, selectedMarker.lon),
