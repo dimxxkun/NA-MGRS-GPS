@@ -458,6 +458,25 @@
         left: 0;
       }
     }
+    /* Floating show-toolbar button (appears when toolbar is hidden) */
+    #showToolbarBtn {
+      position: fixed;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      background: linear-gradient(135deg, #00ff9f, #00b894);
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 0 8px 8px 0;
+      transition: transform 0.3s ease;
+      box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+      z-index: 1002;
+      display: none;
+    }
+    #showToolbarBtn i {
+      transition: transform 0.3s ease;
+    }
   </style>
 </head>
 <body>
@@ -538,6 +557,7 @@
       <button id="clearBuffersBtn"><i class="fas fa-trash-alt"></i> Clear Buffers</button>
     </div>
   </div>
+  <button id="showToolbarBtn" aria-label="Show toolbar"><i class="fas fa-angle-right"></i></button>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
@@ -779,6 +799,7 @@
       // Toolbar elements
       const toolbar = document.getElementById('toolbar');
       const toggleToolbarBtn = document.getElementById('toggleToolbarBtn');
+      const showToolbarBtn = document.getElementById('showToolbarBtn');
       const createBufferBtn = document.getElementById('createBufferBtn');
       const bufferPanel = document.getElementById('bufferPanel');
       const bufferLocation = document.getElementById('bufferLocation');
@@ -1444,6 +1465,13 @@
       toggleToolbarBtn.addEventListener('click', () => {
         console.log('Toggle button clicked, current hidden state:', toolbar.classList.contains('hidden'));
         toolbar.classList.toggle('hidden');
+        showToolbarBtn.style.display = toolbar.classList.contains('hidden') ? 'block' : 'none';
+      });
+
+      showToolbarBtn.addEventListener('click', () => {
+        console.log('Show toolbar button clicked');
+        toolbar.classList.remove('hidden');
+        showToolbarBtn.style.display = 'none';
       });
 
       createBufferBtn.addEventListener('click', () => {
@@ -1532,6 +1560,8 @@
 
       console.log('Initializing markers');
       loadMarkers();
+      // Initialize show button visibility on load
+      showToolbarBtn.style.display = toolbar.classList.contains('hidden') ? 'block' : 'none';
     });
   </script>
 </body>
