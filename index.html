@@ -304,39 +304,43 @@
     .leaflet-control-geocoder-results a:hover {
       background: rgba(58, 90, 58, 0.8);
     }
-    #toolbar {
-      position: absolute;
-      left: 0;
-      top: 100px;
-      width: 250px;
-      background: rgba(30, 46, 30, 0.8);
-      padding: 16px;
-      border-right: 1px solid rgba(75, 112, 75, 0.5);
-      box-shadow: 4px 0 8px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 255, 159, 0.1);
-      transition: left 0.5s ease, opacity 0.5s ease;
-      z-index: 1000;
-      border-radius: 0 12px 12px 0;
-      backdrop-filter: blur(10px);
-    }
-    #toolbar.hidden {
-      left: -250px;
-      opacity: 0;
-    }
+   #toolbar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 250px;
+  background: rgba(30, 46, 30, 0.8);
+  padding: 16px;
+  border-right: 1px solid rgba(75, 112, 75, 0.5);
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 255, 159, 0.1);
+  transition: transform 0.5s ease;
+  z-index: 1000;
+  border-radius: 0 12px 12px 0;
+  backdrop-filter: blur(10px);
+  transform: translateX(0);
+  overflow-y: auto;
+}
+#toolbar.hidden {
+  transform: translateX(-250px);
+}
     #toggleToolbarBtn {
-      position: absolute;
-      left: 250px;
-      top: 0;
-      background: linear-gradient(135deg, #00ff9f, #00b894);
-      border: none;
-      padding: 8px;
-      cursor: pointer;
-      border-radius: 0 8px 8px 0;
-      transition: left 0.5s ease, transform 0.3s ease;
-      box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
-    }
-    #toolbar.hidden #toggleToolbarBtn {
-      left: 0;
-    }
+  position: fixed;
+  left: 250px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(135deg, #00ff9f, #00b894);
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 0 8px 8px 0;
+  transition: left 0.5s ease, transform 0.3s ease;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+}
+#toolbar.hidden #toggleToolbarBtn {
+  left: 0;
+}
     #toggleToolbarBtn i {
       transition: transform 0.3s ease;
     }
