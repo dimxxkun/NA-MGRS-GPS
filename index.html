@@ -3,18 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a192f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PF - GEOTRACE</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
+    html { -webkit-text-size-adjust: 100%; }
     body {
       margin: 0;
       font-family: 'Roboto', sans-serif;
       background: linear-gradient(180deg, #0a192f, #1e3a5f);
       color: #e0e0e0;
       overflow-x: hidden;
+    }
+    :focus-visible {
+      outline: 2px solid #00ff9f;
+      outline-offset: 2px;
     }
     .container {
       max-width: 1280px;
@@ -429,6 +437,25 @@
     .leaflet-popup-tip {
       background: rgba(46, 74, 46, 0.9);
     }
+    /* Respect reduced motion preferences (battery and accessibility) */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    /* Avoid hover-only effects on touch devices */
+    @media (hover: none) {
+      button:hover, button:focus {
+        transform: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      }
+      .coord-line:hover {
+        transform: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+    }
     @media (max-width: 768px) {
       #map {
         height: 50vh;
@@ -436,6 +463,7 @@
       .container {
         padding: 16px;
       }
+      h1 { font-size: clamp(1.5rem, 4.5vw, 2rem); }
       button, .copy-btn, .copy-all-btn {
         padding: 10px 16px;
         font-size: 0.9em;
@@ -469,9 +497,7 @@
       }
     }
     @media (max-width: 480px) {
-      h1 {
-        font-size: 1.8em;
-      }
+      h1 { font-size: clamp(1.25rem, 6vw, 1.8rem); }
       .button-group {
         flex-direction: column;
       }
