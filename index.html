@@ -100,6 +100,7 @@
       margin: 24px 0;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 255, 159, 0.1);
       transition: box-shadow 0.3s ease;
+      position: relative;
     }
     #map:hover {
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 255, 159, 0.2);
@@ -460,6 +461,12 @@
       #map {
         height: 50vh;
       }
+      #gpsAccuracyIndicator {
+        left: 10px;
+        padding: 8px 12px;
+        font-size: 0.8em;
+        min-width: 100px;
+      }
       .container {
         padding: 16px;
       }
@@ -498,6 +505,12 @@
     }
     @media (max-width: 480px) {
       h1 { font-size: clamp(1.25rem, 6vw, 1.8rem); }
+      #gpsAccuracyIndicator {
+        left: 8px;
+        padding: 6px 10px;
+        font-size: 0.75em;
+        min-width: 90px;
+      }
       .button-group {
         flex-direction: column;
       }
@@ -536,12 +549,63 @@
     #showToolbarBtn i {
       transition: transform 0.3s ease;
     }
+    
+    /* GPS Accuracy Indicator */
+    #gpsAccuracyIndicator {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(30, 46, 30, 0.9);
+      border: 1px solid rgba(0, 255, 159, 0.2);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e0e0e0;
+      font-size: 0.9em;
+      font-weight: 500;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 6px rgba(0, 255, 159, 0.1);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: none;
+      transition: all 0.3s ease;
+      min-width: 100px;
+      text-align: center;
+    }
+    
+    #gpsAccuracyIndicator.visible {
+      display: block;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    #gpsAccuracyIndicator .accuracy-value {
+      color: #00ff9f;
+      font-weight: 700;
+      font-size: 1.1em;
+      text-shadow: 0 0 5px rgba(0, 255, 159, 0.3);
+    }
+    
+    #gpsAccuracyIndicator .accuracy-label {
+      color: #b0b0b0;
+      font-size: 0.8em;
+      margin-top: 4px;
+    }
+    
+    #gpsAccuracyIndicator .accuracy-icon {
+      margin-right: 8px;
+      color: #00ff9f;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <header><h1>PF - GEOTRACE</h1></header>
-    <div id="map"></div>
+    <div id="map">
+      <div id="gpsAccuracyIndicator">
+        <i class="fas fa-crosshairs accuracy-icon"></i>
+        <div class="accuracy-value">±0m</div>
+        <div class="accuracy-label">GPS Accuracy</div>
+      </div>
+    </div>
     <div class="controls">
       <div class="button-group">
         <button id="getLocationBtn" aria-label="Toggle location tracking"><i class="fas fa-map-marker-alt"></i> Start Tracking Location</button>
@@ -988,6 +1052,19 @@
       }
 
       const elevationCache = new Map();
+      
+      // GPS Accuracy Indicator functionality
+      const gpsAccuracyIndicator = document.getElementById('gpsAccuracyIndicator');
+      
+      function updateGPSAccuracyIndicator(accuracy) {
+        if (accuracy !== null && accuracy !== undefined) {
+          const accuracyValue = gpsAccuracyIndicator.querySelector('.accuracy-value');
+          accuracyValue.textContent = `±${accuracy.toFixed(1)}m`;
+          gpsAccuracyIndicator.classList.add('visible');
+        } else {
+          gpsAccuracyIndicator.classList.remove('visible');
+        }
+      }
 
       function loadMarkers() {
         console.log('Loading markers from localStorage');
@@ -1176,6 +1253,9 @@
         let shouldUpdateDropdown = false;
 
         if (isGps) {
+          // Update GPS accuracy indicator
+          updateGPSAccuracyIndicator(accuracy);
+          
           if (!lastUserLocation || hasLocationChanged(lat, lon, lastUserLocation.lat, lastUserLocation.lon)) {
             currentUserLocation = { lat, lon };
             lastUserLocation = { lat, lon };
@@ -1317,6 +1397,8 @@
         isTracking = false;
         isFirstFix = true;
         getLocationBtn.textContent = "Start Tracking Location";
+        // Hide GPS accuracy indicator when tracking stops
+        updateGPSAccuracyIndicator(null);
         if (!map.hasLayer(esriTerrain)) {
           statusOutput.textContent = "";
         }
