@@ -342,8 +342,7 @@
    #toolbar {
   position: fixed;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 50%;
   width: 250px;
   background: rgba(30, 46, 30, 0.8);
   padding: 16px;
@@ -353,11 +352,10 @@
   z-index: 1000;
   border-radius: 0 12px 12px 0;
   backdrop-filter: blur(10px);
-  transform: translateX(0);
-  overflow-y: auto;
+  transform: translate(0, -50%);
 }
 #toolbar.hidden {
-  transform: translateX(-250px);
+  transform: translate(-250px, -50%);
 }
     #toggleToolbarBtn {
   position: fixed;
