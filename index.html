@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -467,6 +467,22 @@
         font-size: 0.8em;
         min-width: 100px;
       }
+             #compassWidget {
+         right: 10px;
+         bottom: 70px;
+         width: 60px;
+         height: 60px;
+       }
+      .compass-direction {
+        font-size: 0.7em;
+      }
+      .compass-needle {
+        height: 25px;
+      }
+      .compass-bearing {
+        font-size: 0.6em;
+        bottom: -20px;
+      }
       .container {
         padding: 16px;
       }
@@ -510,6 +526,22 @@
         padding: 6px 10px;
         font-size: 0.75em;
         min-width: 90px;
+      }
+             #compassWidget {
+         right: 8px;
+         bottom: 60px;
+         width: 50px;
+         height: 50px;
+       }
+      .compass-direction {
+        font-size: 0.6em;
+      }
+      .compass-needle {
+        height: 20px;
+      }
+      .compass-bearing {
+        font-size: 0.5em;
+        bottom: -18px;
       }
       .button-group {
         flex-direction: column;
@@ -594,6 +626,115 @@
       margin-right: 8px;
       color: #00ff9f;
     }
+
+         /* Compass Widget */
+     #compassWidget {
+       position: absolute;
+       right: 20px;
+       bottom: 80px;
+       width: 80px;
+       height: 80px;
+       background: rgba(30, 46, 30, 0.9);
+       border: 2px solid rgba(0, 255, 159, 0.3);
+       border-radius: 50%;
+       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 255, 159, 0.2);
+       backdrop-filter: blur(10px);
+       z-index: 1000;
+       display: none;
+       transition: all 0.3s ease;
+       cursor: pointer;
+     }
+    
+    #compassWidget.visible {
+      display: block;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    #compassWidget:hover {
+      border-color: rgba(0, 255, 159, 0.6);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 159, 0.3);
+      transform: scale(1.05);
+    }
+    
+    .compass-rose {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+    }
+    
+    .compass-direction {
+      position: absolute;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 0.8em;
+      color: #00ff9f;
+      text-shadow: 0 0 5px rgba(0, 255, 159, 0.5);
+      transform-origin: center;
+    }
+    
+    .compass-north {
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ff4d4d;
+      font-weight: 900;
+    }
+    
+    .compass-east {
+      top: 50%;
+      right: 5px;
+      transform: translateY(-50%);
+    }
+    
+    .compass-south {
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    
+    .compass-west {
+      top: 50%;
+      left: 5px;
+      transform: translateY(-50%);
+    }
+    
+    .compass-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: #00ff9f;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(0, 255, 159, 0.6);
+    }
+    
+    .compass-needle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 30px;
+      background: linear-gradient(to bottom, #ff4d4d 0%, #ff4d4d 50%, #00ff9f 50%, #00ff9f 100%);
+      transform-origin: center;
+      border-radius: 1px;
+      box-shadow: 0 0 4px rgba(0, 255, 159, 0.4);
+    }
+    
+    .compass-bearing {
+      position: absolute;
+      bottom: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7em;
+      color: #00ff9f;
+      text-shadow: 0 0 3px rgba(0, 255, 159, 0.5);
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -604,6 +745,17 @@
         <i class="fas fa-crosshairs accuracy-icon"></i>
         <div class="accuracy-value">±0m</div>
         <div class="accuracy-label">GPS Accuracy</div>
+      </div>
+      <div id="compassWidget" title="Click to toggle compass">
+        <div class="compass-rose">
+          <div class="compass-direction compass-north">N</div>
+          <div class="compass-direction compass-east">E</div>
+          <div class="compass-direction compass-south">S</div>
+          <div class="compass-direction compass-west">W</div>
+          <div class="compass-center"></div>
+          <div class="compass-needle"></div>
+        </div>
+        <div class="compass-bearing">0°</div>
       </div>
     </div>
     <div class="controls">
@@ -873,6 +1025,8 @@
       let lastDropdownUpdate = 0;
       let lastGpsUpdate = 0;
       let lastBufferDropdownUpdate = 0;
+      let lastHeading = null;
+      let headingHistory = [];
 
       const markerIcons = {
         enemy: new L.Icon({
@@ -1064,6 +1218,100 @@
         } else {
           gpsAccuracyIndicator.classList.remove('visible');
         }
+      }
+
+      // Compass Widget functionality
+      const compassWidget = document.getElementById('compassWidget');
+      const compassRose = compassWidget.querySelector('.compass-rose');
+      const compassNeedle = compassWidget.querySelector('.compass-needle');
+      const compassBearing = compassWidget.querySelector('.compass-bearing');
+      let currentHeading = 0;
+      let isCompassVisible = false;
+
+      function updateCompass(heading) {
+        console.log('updateCompass called with heading:', heading);
+        
+        if (heading !== null && heading !== undefined && !isNaN(heading)) {
+          currentHeading = heading;
+          
+          // Rotate the compass rose (directions stay fixed)
+          compassRose.style.transform = `rotate(${-heading}deg)`;
+          
+          // Rotate the needle to point north
+          compassNeedle.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
+          
+          // Update bearing display
+          const bearing = Math.round(heading);
+          compassBearing.textContent = `${bearing}°`;
+          
+          // Show compass if not already visible
+          if (!isCompassVisible) {
+            compassWidget.classList.add('visible');
+            isCompassVisible = true;
+            console.log('Compass made visible with heading:', heading);
+          }
+        } else {
+          // Show compass even without heading data, but with default orientation
+          if (!isCompassVisible) {
+            compassWidget.classList.add('visible');
+            isCompassVisible = true;
+            console.log('Compass made visible without heading data');
+          }
+          
+          // Reset to default orientation
+          compassRose.style.transform = `rotate(0deg)`;
+          compassNeedle.style.transform = `translate(-50%, -50%) rotate(0deg)`;
+          compassBearing.textContent = `N/A`;
+        }
+      }
+
+      // Add compass toggle functionality
+      compassWidget.addEventListener('click', () => {
+        if (isCompassVisible) {
+          compassWidget.classList.remove('visible');
+          isCompassVisible = false;
+        } else if (currentHeading !== null) {
+          compassWidget.classList.add('visible');
+          isCompassVisible = true;
+        }
+      });
+
+      // Calculate heading from movement between GPS points
+      function calculateHeadingFromMovement(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const lat1Rad = lat1 * Math.PI / 180;
+        const lat2Rad = lat2 * Math.PI / 180;
+        
+        const y = Math.sin(dLon) * Math.cos(lat2Rad);
+        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+        
+        let heading = Math.atan2(y, x) * 180 / Math.PI;
+        heading = (heading + 360) % 360; // Normalize to 0-360
+        
+        return heading;
+      }
+
+      // Smooth heading using moving average
+      function smoothHeading(newHeading) {
+        if (newHeading === null || isNaN(newHeading)) return lastHeading;
+        
+        headingHistory.push(newHeading);
+        if (headingHistory.length > 5) {
+          headingHistory.shift();
+        }
+        
+        // Calculate average heading, handling 0/360 degree wrap
+        let sumSin = 0;
+        let sumCos = 0;
+        for (let heading of headingHistory) {
+          sumSin += Math.sin(heading * Math.PI / 180);
+          sumCos += Math.cos(heading * Math.PI / 180);
+        }
+        
+        const avgHeading = Math.atan2(sumSin, sumCos) * 180 / Math.PI;
+        return (avgHeading + 360) % 360;
       }
 
       function loadMarkers() {
@@ -1369,6 +1617,39 @@
         watchId = navigator.geolocation.watchPosition(
           async pos => {
             console.log('GPS position received:', pos.coords);
+            
+            let heading = null;
+            
+            console.log('GPS coords available:', {
+              heading: pos.coords.heading,
+              speed: pos.coords.speed,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude
+            });
+            
+            // Try to get heading from device first
+            if (pos.coords.heading !== null && pos.coords.heading !== undefined && !isNaN(pos.coords.heading)) {
+              heading = pos.coords.heading;
+              console.log('Device heading:', heading);
+            } else if (lastUserLocation) {
+              // Calculate heading from movement if device doesn't provide it
+              const calculatedHeading = calculateHeadingFromMovement(
+                lastUserLocation.lat,
+                lastUserLocation.lon,
+                pos.coords.latitude,
+                pos.coords.longitude
+              );
+              if (calculatedHeading !== null) {
+                heading = smoothHeading(calculatedHeading);
+                console.log('Calculated heading:', heading);
+              }
+            }
+            
+            console.log('Final heading value:', heading);
+            
+            // Update compass with heading (always call updateCompass)
+            updateCompass(heading);
+            
             await throttledUpdateCoordinates(
               pos.coords.latitude,
               pos.coords.longitude,
@@ -1399,6 +1680,8 @@
         getLocationBtn.textContent = "Start Tracking Location";
         // Hide GPS accuracy indicator when tracking stops
         updateGPSAccuracyIndicator(null);
+        // Keep compass visible but reset to default orientation when tracking stops
+        updateCompass(null);
         if (!map.hasLayer(esriTerrain)) {
           statusOutput.textContent = "";
         }
