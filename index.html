@@ -423,6 +423,7 @@
       max-width: 1200px;
       margin: 0 auto;
       padding: 0 20px;
+      position: relative;
     }
     
     /* Logo Styles */
@@ -430,7 +431,6 @@
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      flex: 1;
     }
     
     .logo-image {
@@ -460,10 +460,12 @@
       -webkit-background-clip: text;
       background-clip: text;
       animation: gradientFlow 6s linear infinite, glowPulse 2800ms ease-in-out infinite alternate;
-      position: relative;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
       z-index: 1;
-      flex: 1;
-      text-align: right;
+      text-align: center;
     }
     #map {
       height: 65vh;
