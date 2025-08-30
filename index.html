@@ -783,7 +783,7 @@
       color: #d4d4d4;
       font-size: 0.9em;
     }
-    .buffer-panel input, .buffer-panel select, .marker-panel select {
+    .buffer-panel input, .buffer-panel select, .marker-panel select, .marker-panel input {
       background: rgba(46, 74, 46, 0.7);
       color: #fff;
       border: 1px solid rgba(0, 255, 159, 0.3);
@@ -791,7 +791,7 @@
       border-radius: 6px;
       transition: all 0.3s ease;
     }
-    .buffer-panel input:hover, .buffer-panel select:hover, .marker-panel select:hover {
+    .buffer-panel input:hover, .buffer-panel select:hover, .marker-panel select:hover, .marker-panel input:hover {
       border-color: #00ff9f;
       box-shadow: 0 0 10px rgba(0, 255, 159, 0.2);
     }
@@ -1228,6 +1228,8 @@
           <option value="ally">Ally (Blue)</option>
           <option value="poi">POI (Yellow)</option>
         </select>
+        <label for="markerName">Marker Name:</label>
+        <input type="text" id="markerName" placeholder="Enter custom name (e.g., ISIS, Base Alpha)" maxlength="50">
         <button id="confirmMarkerBtn"><i class="fas fa-check"></i> Confirm Type</button>
       </div>
       <button id="clearBuffersBtn"><i class="fas fa-trash-alt"></i> Clear Buffers</button>
@@ -1331,12 +1333,13 @@
           <ol>
             <li>Click "Select Marker" button</li>
             <li>Choose marker type (Enemy/Ally/POI)</li>
+            <li>Enter a custom name (optional, e.g., "ISIS", "Base Alpha")</li>
             <li>Click "Confirm Type"</li>
             <li>Click anywhere on the map to place the marker</li>
           </ol>
           
           <div class="tutorial-tip">
-            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Markers are automatically saved and will persist between sessions.
+            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Markers are automatically saved and will persist between sessions. Custom names help you identify specific locations quickly.
           </div>
         </div>
       </div>
@@ -1744,6 +1747,7 @@
       const clearBuffersBtn = document.getElementById('clearBuffersBtn');
       const markerPanel = document.getElementById('markerPanel');
       const markerType = document.getElementById('markerType');
+      const markerName = document.getElementById('markerName');
       const confirmMarkerBtn = document.getElementById('confirmMarkerBtn');
 
       let watchId = null, isTracking = false, isFirstFix = true;
@@ -1995,10 +1999,11 @@
               if (type === 'enemy') enemyCounter = Math.max(enemyCounter, marker.typeId);
               else if (type === 'ally') allyCounter = Math.max(allyCounter, marker.typeId);
               else if (type === 'poi') poiCounter = Math.max(poiCounter, marker.typeId);
+              const displayName = marker.name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${marker.typeId}`;
               const leafletMarker = L.marker([marker.lat, marker.lon], { icon: markerIcons[type] })
-                .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} ${marker.typeId}`)
+                .bindPopup(displayName)
                 .addTo(markerLayer);
-              markers.push({ typeId: marker.typeId, lat: marker.lat, lon: marker.lon, type, marker: leafletMarker });
+              markers.push({ typeId: marker.typeId, lat: marker.lat, lon: marker.lon, type, marker: leafletMarker, name: marker.name });
             }
           });
           console.log('Markers after loading:', markers);
@@ -2010,10 +2015,10 @@
         }
       }
 
-      function saveMarker(lat, lon, typeId, type) {
-        console.log('Saving marker:', { lat, lon, typeId, type });
+      function saveMarker(lat, lon, typeId, type, markerName = null) {
+        console.log('Saving marker:', { lat, lon, typeId, type, name: markerName });
         const storedMarkers = JSON.parse(localStorage.getItem('markers') || '[]');
-        storedMarkers.push({ lat, lon, typeId, type });
+        storedMarkers.push({ lat, lon, typeId, type, name: markerName });
         localStorage.setItem('markers', JSON.stringify(storedMarkers));
       }
 
@@ -2047,7 +2052,8 @@
 
         enemySelect.innerHTML = '<option value="">Select a marker...</option>';
         markers.forEach(marker => {
-          let label = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
+          const displayName = marker.name || `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
+          let label = displayName;
           if (currentUserLocation) {
             const distance = calculateDistance(
               currentUserLocation.lat,
@@ -2086,7 +2092,8 @@
         markers.forEach(marker => {
           const option = document.createElement('option');
           option.value = `${marker.type}-${marker.typeId}`;
-          option.textContent = `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
+          const displayName = marker.name || `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
+          option.textContent = displayName;
           bufferLocation.appendChild(option);
         });
 
@@ -2119,7 +2126,8 @@
               lon
             ).toFixed(2) + ` ${distanceUnit}`;
           }
-          return { id: `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`, lat, lon, mgrs, distance };
+          const displayName = marker.name || `${marker.type.charAt(0).toUpperCase() + marker.type.slice(1)} ${marker.typeId}`;
+          return { id: displayName, lat, lon, mgrs, distance };
         });
         const csv = `ID,Latitude,Longitude,MGRS,Distance (${distanceUnit})\n` + data.map(d => `${d.id},${d.lat},${d.lon},${d.mgrs},${d.distance}`).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
@@ -2155,7 +2163,7 @@
         }
       }
 
-      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, typeId = null, type = null) {
+      async function updateCoordinates(lat, lon, accuracy = null, altitude = null, altitudeAccuracy = null, isGps = false, typeId = null, type = null, markerName = null) {
         console.log('Updating coordinates:', { lat, lon, accuracy, altitude, altitudeAccuracy, isGps, typeId, type });
 
         let mgrs;
@@ -2246,12 +2254,13 @@
           }
           updateBufferLocationDropdown();
         } else if (typeId && type && !markers.some(marker => marker.type === type && marker.typeId === typeId)) {
+          const displayName = markerName || `${type.charAt(0).toUpperCase() + type.slice(1)} ${typeId}`;
           const marker = L.marker([lat, lon], { icon: markerIcons[type] })
-            .bindPopup(`${type.charAt(0).toUpperCase() + type.slice(1)} ${typeId}`)
+            .bindPopup(displayName)
             .addTo(markerLayer)
             .openPopup();
-          markers.push({ typeId, lat, lon, type, marker });
-          saveMarker(lat, lon, typeId, type);
+          markers.push({ typeId, lat, lon, type, marker, name: markerName });
+          saveMarker(lat, lon, typeId, type, markerName);
           shouldUpdateDropdown = true;
           updateBufferLocationDropdown();
         }
@@ -2376,6 +2385,7 @@
       confirmMarkerBtn.addEventListener('click', () => {
         console.log('Confirm Marker Type button clicked, selected type:', markerType.value);
         const selectedType = markerType.value;
+        const markerName = document.getElementById('markerName').value.trim();
         if (!selectedType) {
           errorOutput.textContent = "Please select a marker type.";
           return;
@@ -2384,36 +2394,41 @@
         selectEnemyBtn.disabled = false;
         map.getContainer().style.cursor = 'crosshair';
         map.once('click', async e => {
-          console.log('Map clicked for marker:', { latlng: e.latlng, type: selectedType });
+          console.log('Map clicked for marker:', { latlng: e.latlng, type: selectedType, name: markerName });
           let typeId;
           if (selectedType === 'enemy') typeId = ++enemyCounter;
           else if (selectedType === 'ally') typeId = ++allyCounter;
           else if (selectedType === 'poi') typeId = ++poiCounter;
-          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, typeId, selectedType);
+          await updateCoordinates(e.latlng.lat, e.latlng.lng, null, null, null, false, typeId, selectedType, markerName);
           try {
             L.Control.Geocoder.nominatim().reverse(
               L.latLng(e.latlng.lat, e.latlng.lng),
               map.getZoom(),
               (result) => {
+                const displayName = markerName || `${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
                 if (result && result.name) {
-                  statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId} (${result.name})`;
+                  statusOutput.textContent = `Located: ${displayName} (${result.name})`;
                 } else {
-                  statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
+                  statusOutput.textContent = `Located: ${displayName}`;
                   console.warn('No place name found for coordinates:', e.latlng.lat, e.latlng.lng);
                 }
               },
               (error) => {
                 console.error('Reverse geocoding error:', error);
-                statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
+                const displayName = markerName || `${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
+                statusOutput.textContent = `Located: ${displayName}`;
                 errorOutput.textContent = "Failed to fetch place name.";
               }
             );
           } catch (error) {
             console.error('Reverse geocoding failed:', error);
-            statusOutput.textContent = `Located: ${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
+            const displayName = markerName || `${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} ${typeId}`;
+            statusOutput.textContent = `Located: ${displayName}`;
             errorOutput.textContent = "Failed to fetch place name.";
           }
           map.getContainer().style.cursor = '';
+          // Clear the marker name input for next use
+          document.getElementById('markerName').value = '';
         });
       });
 
