@@ -340,6 +340,10 @@
         bottom: 15px;
         right: 15px;
       }
+      
+      .logo-image {
+        max-width: 250px;
+      }
     }
     
     .container {
@@ -409,6 +413,26 @@
     @keyframes scanSweep {
       0% { left: -40%; }
       100% { left: 100%; }
+    }
+    
+    /* Logo Styles */
+    .logo-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 0;
+    }
+    
+    .logo-image {
+      max-width: 300px;
+      height: auto;
+      filter: drop-shadow(0 0 10px rgba(0, 255, 159, 0.3));
+      transition: all 0.3s ease;
+    }
+    
+    .logo-image:hover {
+      filter: drop-shadow(0 0 15px rgba(0, 255, 159, 0.5));
+      transform: scale(1.02);
     }
     #map {
       height: 65vh;
@@ -839,6 +863,9 @@
     }
     @media (max-width: 480px) {
       h1 { font-size: clamp(1.25rem, 6vw, 1.8rem); }
+      .logo-image {
+        max-width: 200px;
+      }
       #gpsAccuracyIndicator {
         left: 8px;
         padding: 6px 10px;
@@ -1059,7 +1086,11 @@
 </head>
 <body>
   <div class="container">
-    <header><h1>PF - GEOTRACE</h1></header>
+    <header>
+      <div class="logo-container">
+        <img src="Proforce-Galaxies-Logo-white-1024x241.webp" alt="Proforce Galaxies Logo" class="logo-image">
+      </div>
+    </header>
     <div id="map">
       <div id="gpsAccuracyIndicator">
         <i class="fas fa-crosshairs accuracy-icon"></i>
