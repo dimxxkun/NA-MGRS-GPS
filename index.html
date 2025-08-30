@@ -415,16 +415,26 @@
       100% { left: 100%; }
     }
     
+    /* Header Layout */
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    
     /* Logo Styles */
     .logo-container {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 20px 0;
+      justify-content: flex-start;
+      flex: 1;
     }
     
     .logo-image {
-      max-width: 300px;
+      max-width: 250px;
       height: auto;
       filter: drop-shadow(0 0 10px rgba(0, 255, 159, 0.3));
       transition: all 0.3s ease;
@@ -433,6 +443,27 @@
     .logo-image:hover {
       filter: drop-shadow(0 0 15px rgba(0, 255, 159, 0.5));
       transform: scale(1.02);
+    }
+    
+    /* App Title Styles */
+    .app-title {
+      margin: 0;
+      font-size: 2.2em;
+      font-weight: 700;
+      color: transparent;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: 'Orbitron', sans-serif;
+      text-shadow: 0 0 10px rgba(0, 255, 159, 0.35), 0 0 20px rgba(0, 255, 159, 0.2);
+      background: linear-gradient(90deg, #00ff9f, #00bcd4, #4d79ff, #00ff9f);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: gradientFlow 6s linear infinite, glowPulse 2800ms ease-in-out infinite alternate;
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      text-align: right;
     }
     #map {
       height: 65vh;
@@ -828,7 +859,18 @@
       .container {
         padding: 16px;
       }
-      h1 { font-size: clamp(1.5rem, 4.5vw, 2rem); }
+      .header-content {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+      }
+      .logo-container {
+        justify-content: center;
+      }
+      .app-title {
+        text-align: center;
+        font-size: clamp(1.5rem, 4.5vw, 2rem);
+      }
       button, .copy-btn, .copy-all-btn {
         padding: 10px 16px;
         font-size: 0.9em;
@@ -862,7 +904,9 @@
       }
     }
     @media (max-width: 480px) {
-      h1 { font-size: clamp(1.25rem, 6vw, 1.8rem); }
+      .app-title {
+        font-size: clamp(1.25rem, 6vw, 1.8rem);
+      }
       .logo-image {
         max-width: 200px;
       }
@@ -1087,8 +1131,11 @@
 <body>
   <div class="container">
     <header>
-      <div class="logo-container">
-        <img src="Proforce-Galaxies-Logo-white-1024x241.webp" alt="Proforce Galaxies Logo" class="logo-image">
+      <div class="header-content">
+        <div class="logo-container">
+          <img src="Proforce-Galaxies-Logo-white-1024x241.webp" alt="Proforce Galaxies Logo" class="logo-image">
+        </div>
+        <h1 class="app-title">PF - GEOTRACE</h1>
       </div>
     </header>
     <div id="map">
