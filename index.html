@@ -24,6 +24,324 @@
       outline: 2px solid #00ff9f;
       outline-offset: 2px;
     }
+    
+    /* Tutorial/Onboarding Styles */
+    .tutorial-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      display: none;
+      backdrop-filter: blur(5px);
+    }
+    
+    .tutorial-overlay.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .tutorial-modal {
+      background: linear-gradient(135deg, rgba(30, 46, 30, 0.95), rgba(46, 74, 46, 0.95));
+      border: 2px solid rgba(0, 255, 159, 0.3);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 255, 159, 0.2);
+      backdrop-filter: blur(15px);
+      position: relative;
+    }
+    
+    .tutorial-header {
+      text-align: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid rgba(0, 255, 159, 0.2);
+      padding-bottom: 16px;
+    }
+    
+    .tutorial-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.8em;
+      font-weight: 700;
+      color: #00ff9f;
+      margin: 0 0 8px 0;
+      text-shadow: 0 0 10px rgba(0, 255, 159, 0.5);
+    }
+    
+    .tutorial-subtitle {
+      color: #b0b0b0;
+      font-size: 1em;
+      margin: 0;
+    }
+    
+    .tutorial-step {
+      display: none;
+      animation: slideIn 0.4s ease-out;
+    }
+    
+    .tutorial-step.active {
+      display: block;
+    }
+    
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .tutorial-step h3 {
+      color: #00ff9f;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3em;
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .tutorial-step-icon {
+      font-size: 1.2em;
+      color: #00ff9f;
+    }
+    
+    .tutorial-content {
+      color: #e0e0e0;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    
+    .tutorial-content ul {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+    
+    .tutorial-content li {
+      margin: 8px 0;
+      color: #d4d4d4;
+    }
+    
+    .tutorial-content strong {
+      color: #00ff9f;
+      font-weight: 500;
+    }
+    
+    .tutorial-highlight {
+      background: rgba(0, 255, 159, 0.1);
+      border: 1px solid rgba(0, 255, 159, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 16px 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9em;
+      color: #00ff9f;
+    }
+    
+    .tutorial-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 24px;
+      gap: 16px;
+    }
+    
+    .tutorial-btn {
+      background: linear-gradient(135deg, #00ff9f, #00b894);
+      color: #0a192f;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 500;
+      font-size: 0.9em;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .tutorial-btn:hover {
+      background: linear-gradient(135deg, #00b894, #00ff9f);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 255, 159, 0.3);
+    }
+    
+    .tutorial-btn:disabled {
+      background: #3a3a3a;
+      color: #666;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .tutorial-btn.secondary {
+      background: linear-gradient(135deg, #4d79ff, #004dff);
+      color: #fff;
+    }
+    
+    .tutorial-btn.secondary:hover {
+      background: linear-gradient(135deg, #004dff, #4d79ff);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4), 0 0 15px rgba(77, 121, 255, 0.3);
+    }
+    
+    .tutorial-progress {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin: 16px 0;
+    }
+    
+    .tutorial-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(0, 255, 159, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .tutorial-dot.active {
+      background: #00ff9f;
+      box-shadow: 0 0 8px rgba(0, 255, 159, 0.5);
+    }
+    
+    .tutorial-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: #b0b0b0;
+      font-size: 1.5em;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      padding: 8px;
+      border-radius: 50%;
+    }
+    
+    .tutorial-close:hover {
+      color: #00ff9f;
+      background: rgba(0, 255, 159, 0.1);
+    }
+    
+    .help-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #00ff9f, #00b894);
+      color: #0a192f;
+      border: none;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.5em;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 159, 0.3);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .help-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 255, 159, 0.4);
+    }
+    
+    .tutorial-feature-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    
+    .tutorial-feature-item {
+      background: rgba(46, 74, 46, 0.3);
+      border: 1px solid rgba(0, 255, 159, 0.2);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    
+    .tutorial-feature-item:hover {
+      background: rgba(58, 90, 58, 0.4);
+      border-color: rgba(0, 255, 159, 0.4);
+      transform: translateY(-2px);
+    }
+    
+    .tutorial-feature-icon {
+      font-size: 2em;
+      color: #00ff9f;
+      margin-bottom: 8px;
+    }
+    
+    .tutorial-feature-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.9em;
+      color: #00ff9f;
+      margin: 0 0 4px 0;
+    }
+    
+    .tutorial-feature-desc {
+      font-size: 0.8em;
+      color: #b0b0b0;
+      margin: 0;
+    }
+    
+    .tutorial-warning {
+      background: rgba(255, 77, 77, 0.1);
+      border: 1px solid rgba(255, 77, 77, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 16px 0;
+      color: #ff4d4d;
+      font-size: 0.9em;
+    }
+    
+    .tutorial-tip {
+      background: rgba(77, 121, 255, 0.1);
+      border: 1px solid rgba(77, 121, 255, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 16px 0;
+      color: #4d79ff;
+      font-size: 0.9em;
+    }
+    
+    @media (max-width: 768px) {
+      .tutorial-modal {
+        padding: 24px;
+        margin: 20px;
+        max-height: 85vh;
+      }
+      
+      .tutorial-title {
+        font-size: 1.5em;
+      }
+      
+      .tutorial-navigation {
+        flex-direction: column;
+        gap: 12px;
+      }
+      
+      .tutorial-btn {
+        width: 100%;
+      }
+      
+      .help-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2em;
+        bottom: 15px;
+        right: 15px;
+      }
+    }
+    
     .container {
       max-width: 1280px;
       margin: 0 auto;
@@ -835,6 +1153,260 @@
     </div>
   </div>
   <button id="showToolbarBtn" aria-label="Show toolbar"><i class="fas fa-angle-right"></i></button>
+
+  <!-- Tutorial/Help System -->
+  <button id="helpBtn" class="help-btn" aria-label="Help and Tutorial" title="Help & Tutorial">
+    <i class="fas fa-question"></i>
+  </button>
+
+  <div id="tutorialOverlay" class="tutorial-overlay">
+    <div class="tutorial-modal">
+      <button id="tutorialClose" class="tutorial-close" aria-label="Close tutorial">
+        <i class="fas fa-times"></i>
+      </button>
+      
+      <div class="tutorial-header">
+        <h1 class="tutorial-title">PF - GEOTRACE Tutorial</h1>
+        <p class="tutorial-subtitle">Master the art of precision geolocation tracking</p>
+      </div>
+
+      <!-- Step 1: Welcome -->
+      <div id="step1" class="tutorial-step active">
+        <h3><i class="fas fa-rocket tutorial-step-icon"></i>Welcome to GEOTRACE</h3>
+        <div class="tutorial-content">
+          <p>Welcome to <strong>PF - GEOTRACE</strong>, your advanced geolocation tracking and mapping solution. This tutorial will guide you through all the essential features to help you become proficient with the application.</p>
+          
+          <div class="tutorial-highlight">
+            <strong>What you'll learn:</strong>
+            <ul>
+              <li>GPS tracking and location monitoring</li>
+              <li>Marker placement and management</li>
+              <li>Buffer creation and analysis</li>
+              <li>Coordinate systems and conversions</li>
+              <li>Advanced mapping features</li>
+            </ul>
+          </div>
+          
+          <div class="tutorial-tip">
+            <i class="fas fa-lightbulb"></i> <strong>Pro Tip:</strong> You can access this tutorial anytime by clicking the help button (?) in the bottom-right corner.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: GPS Tracking -->
+      <div id="step2" class="tutorial-step">
+        <h3><i class="fas fa-map-marker-alt tutorial-step-icon"></i>GPS Location Tracking</h3>
+        <div class="tutorial-content">
+          <p>The core feature of GEOTRACE is real-time GPS tracking. Here's how to get started:</p>
+          
+          <ul>
+            <li><strong>Start Tracking:</strong> Click the "Start Tracking Location" button to begin GPS monitoring</li>
+            <li><strong>GPS Accuracy:</strong> Monitor your location accuracy with the real-time indicator</li>
+            <li><strong>Compass Widget:</strong> View your heading and direction with the interactive compass</li>
+            <li><strong>Auto-Centering:</strong> Use "Center on Me" to quickly return to your current position</li>
+          </ul>
+          
+          <div class="tutorial-warning">
+            <i class="fas fa-exclamation-triangle"></i> <strong>Important:</strong> Allow location access when prompted by your browser for GPS tracking to work.
+          </div>
+          
+          <div class="tutorial-highlight">
+            <strong>GPS Features:</strong>
+            <ul>
+              <li>Real-time coordinate updates</li>
+              <li>Altitude and AGL (Above Ground Level) calculations</li>
+              <li>Movement tracking and heading detection</li>
+              <li>Accuracy monitoring and feedback</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Marker System -->
+      <div id="step3" class="tutorial-step">
+        <h3><i class="fas fa-crosshairs tutorial-step-icon"></i>Marker Placement System</h3>
+        <div class="tutorial-content">
+          <p>GEOTRACE uses a sophisticated marker system for point-of-interest tracking:</p>
+          
+          <div class="tutorial-feature-list">
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-skull"></i></div>
+              <div class="tutorial-feature-title">Enemy Markers</div>
+              <div class="tutorial-feature-desc">Red markers for hostile positions</div>
+            </div>
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-shield-alt"></i></div>
+              <div class="tutorial-feature-title">Ally Markers</div>
+              <div class="tutorial-feature-desc">Blue markers for friendly positions</div>
+            </div>
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-map-pin"></i></div>
+              <div class="tutorial-feature-title">POI Markers</div>
+              <div class="tutorial-feature-desc">Yellow markers for points of interest</div>
+            </div>
+          </div>
+          
+          <p><strong>How to place markers:</strong></p>
+          <ol>
+            <li>Click "Select Marker" button</li>
+            <li>Choose marker type (Enemy/Ally/POI)</li>
+            <li>Click "Confirm Type"</li>
+            <li>Click anywhere on the map to place the marker</li>
+          </ol>
+          
+          <div class="tutorial-tip">
+            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Markers are automatically saved and will persist between sessions.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Buffer System -->
+      <div id="step4" class="tutorial-step">
+        <h3><i class="fas fa-draw-polygon tutorial-step-icon"></i>Buffer Creation & Analysis</h3>
+        <div class="tutorial-content">
+          <p>Create circular buffers around any location for area analysis and planning:</p>
+          
+          <ul>
+            <li><strong>Buffer Location:</strong> Choose from your current position or any placed marker</li>
+            <li><strong>Radius Control:</strong> Set buffer size in meters, kilometers, or miles</li>
+            <li><strong>Visual Customization:</strong> Adjust color and opacity for different scenarios</li>
+            <li><strong>Multiple Buffers:</strong> Create several buffers for complex analysis</li>
+          </ul>
+          
+          <div class="tutorial-highlight">
+            <strong>Buffer Applications:</strong>
+            <ul>
+              <li>Range analysis for equipment or weapons</li>
+              <li>Coverage area planning</li>
+              <li>Safety zone establishment</li>
+              <li>Operational area definition</li>
+            </ul>
+          </div>
+          
+          <div class="tutorial-tip">
+            <i class="fas fa-lightbulb"></i> <strong>Pro Tip:</strong> Use different colors for different buffer types (red for danger zones, green for safe areas, etc.).
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5: Coordinate Systems -->
+      <div id="step5" class="tutorial-step">
+        <h3><i class="fas fa-globe tutorial-step-icon"></i>Coordinate Systems & Conversions</h3>
+        <div class="tutorial-content">
+          <p>GEOTRACE supports multiple coordinate systems for maximum compatibility:</p>
+          
+          <div class="tutorial-feature-list">
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-hashtag"></i></div>
+              <div class="tutorial-feature-title">MGRS</div>
+              <div class="tutorial-feature-desc">Military Grid Reference System</div>
+            </div>
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-compass"></i></div>
+              <div class="tutorial-feature-title">Lat/Long</div>
+              <div class="tutorial-feature-desc">Decimal degrees format</div>
+            </div>
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-ruler"></i></div>
+              <div class="tutorial-feature-title">DMS</div>
+              <div class="tutorial-feature-desc">Degrees, Minutes, Seconds</div>
+            </div>
+            <div class="tutorial-feature-item">
+              <div class="tutorial-feature-icon"><i class="fas fa-map"></i></div>
+              <div class="tutorial-feature-title">UTM</div>
+              <div class="tutorial-feature-desc">Universal Transverse Mercator</div>
+            </div>
+          </div>
+          
+          <p><strong>Features:</strong></p>
+          <ul>
+            <li>One-click copying of any coordinate format</li>
+            <li>Automatic conversion between all systems</li>
+            <li>Distance calculations in kilometers or miles</li>
+            <li>Export functionality for data analysis</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Step 6: Advanced Features -->
+      <div id="step6" class="tutorial-step">
+        <h3><i class="fas fa-cogs tutorial-step-icon"></i>Advanced Features & Tips</h3>
+        <div class="tutorial-content">
+          <p>Master these advanced features to maximize your GEOTRACE experience:</p>
+          
+          <ul>
+            <li><strong>Map Layers:</strong> Switch between satellite, terrain, and street maps</li>
+            <li><strong>Search Function:</strong> Search by place names, coordinates, or MGRS codes</li>
+            <li><strong>Toolbar:</strong> Access advanced tools via the collapsible sidebar</li>
+            <li><strong>Export Data:</strong> Download marker coordinates as CSV files</li>
+            <li><strong>Unit Toggle:</strong> Switch between metric and imperial units</li>
+          </ul>
+          
+          <div class="tutorial-highlight">
+            <strong>Keyboard Shortcuts:</strong>
+            <ul>
+              <li><strong>Space:</strong> Toggle GPS tracking</li>
+              <li><strong>Escape:</strong> Cancel marker placement</li>
+              <li><strong>Ctrl+C:</strong> Copy selected coordinates</li>
+            </ul>
+          </div>
+          
+          <div class="tutorial-warning">
+            <i class="fas fa-exclamation-triangle"></i> <strong>Security Note:</strong> Always ensure you have proper authorization before tracking locations in sensitive areas.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 7: Getting Started -->
+      <div id="step7" class="tutorial-step">
+        <h3><i class="fas fa-play tutorial-step-icon"></i>Ready to Start</h3>
+        <div class="tutorial-content">
+          <p>You're now ready to use GEOTRACE effectively! Here's a quick checklist to get started:</p>
+          
+          <div class="tutorial-highlight">
+            <strong>Quick Start Checklist:</strong>
+            <ol>
+              <li>Allow location access when prompted</li>
+              <li>Click "Start Tracking Location" to begin GPS monitoring</li>
+              <li>Familiarize yourself with the coordinate display panel</li>
+              <li>Try placing a marker to test the system</li>
+              <li>Experiment with different map layers</li>
+              <li>Create a buffer around your location</li>
+            </ol>
+          </div>
+          
+          <div class="tutorial-tip">
+            <i class="fas fa-lightbulb"></i> <strong>Remember:</strong> You can always return to this tutorial by clicking the help button. Practice makes perfect!
+          </div>
+          
+          <p>GEOTRACE is designed to be intuitive and powerful. Take your time exploring the features, and don't hesitate to experiment with different settings and configurations.</p>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="tutorial-progress">
+        <div class="tutorial-dot active" data-step="1"></div>
+        <div class="tutorial-dot" data-step="2"></div>
+        <div class="tutorial-dot" data-step="3"></div>
+        <div class="tutorial-dot" data-step="4"></div>
+        <div class="tutorial-dot" data-step="5"></div>
+        <div class="tutorial-dot" data-step="6"></div>
+        <div class="tutorial-dot" data-step="7"></div>
+      </div>
+
+      <div class="tutorial-navigation">
+        <button id="tutorialPrev" class="tutorial-btn secondary" disabled>
+          <i class="fas fa-chevron-left"></i> Previous
+        </button>
+        <button id="tutorialNext" class="tutorial-btn">
+          Next <i class="fas fa-chevron-right"></i>
+        </button>
+        <button id="tutorialSkip" class="tutorial-btn secondary" style="display: none;">
+          Skip Tutorial
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.9.0/dist/proj4.js"></script>
@@ -1999,6 +2571,168 @@
       loadMarkers();
       // Initialize show button visibility on load
       showToolbarBtn.style.display = toolbar.classList.contains('hidden') ? 'block' : 'none';
+
+      // Tutorial/Onboarding System
+      const tutorialOverlay = document.getElementById('tutorialOverlay');
+      const helpBtn = document.getElementById('helpBtn');
+      const tutorialClose = document.getElementById('tutorialClose');
+      const tutorialNext = document.getElementById('tutorialNext');
+      const tutorialPrev = document.getElementById('tutorialPrev');
+      const tutorialSkip = document.getElementById('tutorialSkip');
+      const tutorialDots = document.querySelectorAll('.tutorial-dot');
+      const tutorialSteps = document.querySelectorAll('.tutorial-step');
+      
+      let currentTutorialStep = 1;
+      const totalTutorialSteps = 7;
+      let hasSeenTutorial = localStorage.getItem('geotrace_tutorial_completed') === 'true';
+      
+      // Check if this is the first visit
+      if (!hasSeenTutorial) {
+        // Show tutorial automatically on first visit after a short delay
+        setTimeout(() => {
+          showTutorial();
+        }, 2000);
+      }
+      
+      function showTutorial() {
+        tutorialOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        updateTutorialNavigation();
+      }
+      
+      function hideTutorial() {
+        tutorialOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+        // Mark tutorial as completed
+        localStorage.setItem('geotrace_tutorial_completed', 'true');
+        hasSeenTutorial = true;
+      }
+      
+      function goToTutorialStep(step) {
+        if (step < 1 || step > totalTutorialSteps) return;
+        
+        // Hide all steps
+        tutorialSteps.forEach(s => s.classList.remove('active'));
+        tutorialDots.forEach(d => d.classList.remove('active'));
+        
+        // Show current step
+        document.getElementById(`step${step}`).classList.add('active');
+        document.querySelector(`[data-step="${step}"]`).classList.add('active');
+        
+        currentTutorialStep = step;
+        updateTutorialNavigation();
+      }
+      
+      function updateTutorialNavigation() {
+        // Update Previous button
+        tutorialPrev.disabled = currentTutorialStep === 1;
+        
+        // Update Next button
+        if (currentTutorialStep === totalTutorialSteps) {
+          tutorialNext.innerHTML = 'Finish <i class="fas fa-check"></i>';
+        } else {
+          tutorialNext.innerHTML = 'Next <i class="fas fa-chevron-right"></i>';
+        }
+        
+        // Show/hide Skip button on first step
+        tutorialSkip.style.display = currentTutorialStep === 1 ? 'block' : 'none';
+      }
+      
+      function nextTutorialStep() {
+        if (currentTutorialStep < totalTutorialSteps) {
+          goToTutorialStep(currentTutorialStep + 1);
+        } else {
+          hideTutorial();
+        }
+      }
+      
+      function prevTutorialStep() {
+        if (currentTutorialStep > 1) {
+          goToTutorialStep(currentTutorialStep - 1);
+        }
+      }
+      
+      // Event listeners for tutorial
+      helpBtn.addEventListener('click', showTutorial);
+      tutorialClose.addEventListener('click', hideTutorial);
+      tutorialNext.addEventListener('click', nextTutorialStep);
+      tutorialPrev.addEventListener('click', prevTutorialStep);
+      tutorialSkip.addEventListener('click', hideTutorial);
+      
+      // Click on progress dots
+      tutorialDots.forEach(dot => {
+        dot.addEventListener('click', () => {
+          const step = parseInt(dot.dataset.step);
+          goToTutorialStep(step);
+        });
+      });
+      
+      // Close tutorial on overlay click (but not modal click)
+      tutorialOverlay.addEventListener('click', (e) => {
+        if (e.target === tutorialOverlay) {
+          hideTutorial();
+        }
+      });
+      
+      // Keyboard navigation for tutorial
+      document.addEventListener('keydown', (e) => {
+        if (!tutorialOverlay.classList.contains('active')) return;
+        
+        switch (e.key) {
+          case 'Escape':
+            hideTutorial();
+            break;
+          case 'ArrowRight':
+          case ' ':
+            e.preventDefault();
+            nextTutorialStep();
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            prevTutorialStep();
+            break;
+        }
+      });
+      
+      // Add keyboard shortcuts for main app
+      document.addEventListener('keydown', (e) => {
+        if (tutorialOverlay.classList.contains('active')) return;
+        
+        switch (e.key) {
+          case ' ':
+            e.preventDefault();
+            if (isTracking) {
+              stopTracking();
+            } else {
+              startTracking();
+            }
+            break;
+          case 'Escape':
+            // Cancel marker placement if active
+            if (map.getContainer().style.cursor === 'crosshair') {
+              map.getContainer().style.cursor = '';
+              markerPanel.classList.remove('active');
+              selectEnemyBtn.disabled = false;
+            }
+            break;
+        }
+      });
+      
+      // Add tooltips for better UX
+      const tooltipElements = [
+        { element: getLocationBtn, text: 'Start/Stop GPS tracking' },
+        { element: selectEnemyBtn, text: 'Place markers on the map' },
+        { element: clearEnemyBtn, text: 'Remove all markers' },
+        { element: centerBtn, text: 'Center map on your location' },
+        { element: exportBtnIn, text: 'Export marker data as CSV' },
+        { element: toggleUnitsBtn, text: 'Switch between km and miles' }
+      ];
+      
+      tooltipElements.forEach(({ element, text }) => {
+        element.title = text;
+      });
+      
+      console.log('Tutorial system initialized');
     });
   </script>
 </body>
