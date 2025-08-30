@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -642,7 +642,6 @@
        z-index: 1000;
        display: none;
        transition: all 0.3s ease;
-       cursor: pointer;
      }
     
     #compassWidget.visible {
@@ -650,11 +649,12 @@
       animation: fadeIn 0.5s ease-in-out;
     }
     
-    #compassWidget:hover {
-      border-color: rgba(0, 255, 159, 0.6);
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 159, 0.3);
-      transform: scale(1.05);
-    }
+         /* Removed hover effect since compass is no longer clickable */
+     /* #compassWidget:hover {
+       border-color: rgba(0, 255, 159, 0.6);
+       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 159, 0.3);
+       transform: scale(1.05);
+     } */
     
     .compass-rose {
       position: relative;
@@ -730,10 +730,12 @@
       left: 50%;
       transform: translateX(-50%);
       font-family: 'Orbitron', sans-serif;
-      font-size: 0.7em;
+      font-size: 0.65em;
       color: #00ff9f;
       text-shadow: 0 0 3px rgba(0, 255, 159, 0.5);
       white-space: nowrap;
+      min-width: 60px;
+      text-align: center;
     }
   </style>
 </head>
@@ -746,7 +748,7 @@
         <div class="accuracy-value">±0m</div>
         <div class="accuracy-label">GPS Accuracy</div>
       </div>
-      <div id="compassWidget" title="Click to toggle compass">
+             <div id="compassWidget">
         <div class="compass-rose">
           <div class="compass-direction compass-north">N</div>
           <div class="compass-direction compass-east">E</div>
@@ -1240,9 +1242,10 @@
           // Rotate the needle to point north
           compassNeedle.style.transform = `translate(-50%, -50%) rotate(${heading}deg)`;
           
-          // Update bearing display
+          // Update bearing display with both degrees and direction
           const bearing = Math.round(heading);
-          compassBearing.textContent = `${bearing}°`;
+          const direction = getCardinalDirection(heading);
+          compassBearing.textContent = `${bearing}° ${direction}`;
           
           // Show compass if not already visible
           if (!isCompassVisible) {
@@ -1264,17 +1267,27 @@
           compassBearing.textContent = `N/A`;
         }
       }
+      
+      // Function to convert degrees to cardinal direction
+      function getCardinalDirection(heading) {
+        const directions = [
+          'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+          'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+        ];
+        const index = Math.round(heading / 22.5) % 16;
+        return directions[index];
+      }
 
-      // Add compass toggle functionality
-      compassWidget.addEventListener('click', () => {
-        if (isCompassVisible) {
-          compassWidget.classList.remove('visible');
-          isCompassVisible = false;
-        } else if (currentHeading !== null) {
-          compassWidget.classList.add('visible');
-          isCompassVisible = true;
-        }
-      });
+      // Remove compass toggle functionality - compass stays visible when tracking
+      // compassWidget.addEventListener('click', () => {
+      //   if (isCompassVisible) {
+      //     compassWidget.classList.remove('visible');
+      //     isCompassVisible = false;
+      //   } else if (currentHeading !== null) {
+      //     compassWidget.classList.add('visible');
+      //     isCompassVisible = true;
+      //   }
+      // });
 
       // Calculate heading from movement between GPS points
       function calculateHeadingFromMovement(lat1, lon1, lat2, lon2) {
